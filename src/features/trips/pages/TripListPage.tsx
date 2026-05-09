@@ -106,7 +106,7 @@ export default function TripListPage() {
           ) : (
             /* 精致卡牌空状态 */
             <div className="flex flex-col items-center justify-center py-32 glass-card rounded-[40px] border-dashed border-white/10">
-              <h2 className="text-2xl font-black text-white/40 tracking-tighter">待添加</h2>
+              <h2 className="text-2xl font-black text-white/60 tracking-tighter">待添加</h2>
             </div>
           )}
         </FadeContent>

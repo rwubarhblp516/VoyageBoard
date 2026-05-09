@@ -4,8 +4,9 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { useTripStore } from '@/stores/useTripStore'
 import { useNavigate } from 'react-router-dom'
 import TripCard from '../components/TripCard'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Compass, Ship } from 'lucide-react'
 import FadeContent from '@/components/FadeContent'
+import Waves from '@/components/Waves'
 import { Trip } from '@/types/trip'
 
 export default function TripListPage() {
@@ -28,53 +29,80 @@ export default function TripListPage() {
     enabled: !!user,
   })
 
-  const handleSelectTrip = (trip: any) => {
+  const handleSelectTrip = (trip: Trip) => {
     setCurrentTrip(trip)
     navigate('/')
   }
 
   return (
-    <div className="py-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary">我的旅行</h1>
-          <p className="text-text-secondary mt-1">开启一段新旅程，或继续之前的冒险。</p>
-        </div>
-        <button
-          onClick={() => navigate('/trips/new')}
-          className="bg-accent-primary hover:bg-accent-primary/90 text-white p-3 rounded-full shadow-lg transition-all"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
+    <div className="relative min-h-[calc(100vh-2rem)] py-12 px-4">
+      {/* 背景动态海浪 */}
+      <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
+        <Waves
+          lineColor="#0EA5E9"
+          backgroundColor="transparent"
+          waveSpeedX={0.01}
+          waveSpeedY={0.01}
+          waveAmpX={30}
+          waveAmpY={15}
+          xGap={15}
+          yGap={40}
+        />
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
-        </div>
-      ) : trips && trips.length > 0 ? (
-        <FadeContent duration={600}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {trips.map((trip) => (
-              <TripCard
-                key={trip.id}
-                trip={trip}
-                onClick={() => handleSelectTrip(trip)}
-              />
-            ))}
+      <div className="relative z-10 max-w-5xl mx-auto">
+        <header className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-primary/10 text-accent-primary text-[10px] font-black uppercase tracking-widest">
+              <Compass className="h-3 w-3" />
+              航线中心
+            </div>
+            <h1 className="text-5xl font-black text-slate-900 tracking-tighter">我的旅行项目</h1>
+            <p className="text-slate-500 font-bold text-lg">开启新旅程，或继续之前的冒险。</p>
           </div>
-        </FadeContent>
-      ) : (
-        <div className="text-center py-20 glass rounded-3xl">
-          <p className="text-text-muted mb-4">暂无旅行记录</p>
+          
           <button
             onClick={() => navigate('/trips/new')}
-            className="text-accent-primary font-bold hover:underline"
+            className="btn-primary px-8 flex items-center justify-center gap-3 self-start md:self-end"
           >
-            创建您的第一个旅行
+            <Plus className="h-5 w-5" />
+            <span className="tracking-widest font-black">创建新项目</span>
           </button>
-        </div>
-      )}
+        </header>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-32">
+            <Loader2 className="h-12 w-12 animate-spin text-accent-primary/40" />
+          </div>
+        ) : trips && trips.length > 0 ? (
+          <FadeContent duration={800} delay={200}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {trips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  onClick={() => handleSelectTrip(trip)}
+                />
+              ))}
+            </div>
+          </FadeContent>
+        ) : (
+          <FadeContent duration={1000}>
+            <div className="text-center py-32 glass-strong rounded-[40px] border-dashed border-2 border-slate-200">
+              <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Ship className="h-10 w-10 text-slate-300" />
+              </div>
+              <p className="text-slate-400 font-black text-lg mb-8 uppercase tracking-widest">目前暂无航行记录</p>
+              <button
+                onClick={() => navigate('/trips/new')}
+                className="text-accent-primary font-black hover:underline underline-offset-8 decoration-4"
+              >
+                创建您的首条航线 →
+              </button>
+            </div>
+          </FadeContent>
+        )}
+      </div>
     </div>
   )
 }

@@ -2,23 +2,22 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
-import { Plus, Loader2, Utensils, Fuel, Car, MapPin, Ticket, ShoppingBag, Hotel, Zap, MoreHorizontal } from 'lucide-react'
-import FadeContent from '@/components/FadeContent'
+import { Plus, Loader2, Utensils, Fuel, Car, MapPin, Ticket, ShoppingBag, Hotel, Zap, MoreHorizontal, ReceiptText } from 'lucide-react'
 import AddExpenseForm from '../components/AddExpenseForm'
 import { ExpenseCategory } from '@/types/expense'
 import { format } from 'date-fns'
 
 const categoryIcons: Record<ExpenseCategory, React.ReactNode> = {
-  food: <Utensils className="h-5 w-5" />,
-  gas: <Fuel className="h-5 w-5" />,
-  car_rental: <Car className="h-5 w-5" />,
-  parking: <MapPin className="h-5 w-5" />,
-  toll: <Zap className="h-5 w-5" />,
-  ticket: <Ticket className="h-5 w-5" />,
-  shopping: <ShoppingBag className="h-5 w-5" />,
-  hotel: <Hotel className="h-5 w-5" />,
-  entertainment: <MoreHorizontal className="h-5 w-5" />,
-  other: <MoreHorizontal className="h-5 w-5" />,
+  food: <Utensils className="w-5 h-5" />,
+  gas: <Fuel className="w-5 h-5" />,
+  car_rental: <Car className="w-5 h-5" />,
+  parking: <MapPin className="w-5 h-5" />,
+  toll: <Zap className="w-5 h-5" />,
+  ticket: <Ticket className="w-5 h-5" />,
+  shopping: <ShoppingBag className="w-5 h-5" />,
+  hotel: <Hotel className="w-5 h-5" />,
+  entertainment: <MoreHorizontal className="w-5 h-5" />,
+  other: <MoreHorizontal className="w-5 h-5" />,
 }
 
 export default function ExpenseListPage() {
@@ -44,56 +43,64 @@ export default function ExpenseListPage() {
   })
 
   return (
-    <div className="py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">记账账单</h1>
-          <p className="text-text-secondary mt-1">记录旅途中的每一笔开支。</p>
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tight mb-2">记账账单</h1>
+          <p className="text-slate-500 font-medium">清楚记录，享受每一次探索。</p>
         </div>
+        
         <button
           onClick={() => setShowAddForm(true)}
-          className="bg-accent-primary hover:bg-accent-primary/90 text-white p-3 rounded-full shadow-lg transition-all"
+          className="btn-accent shrink-0"
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="w-5 h-5" />
+          记一笔
         </button>
-      </div>
+      </header>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
+        <div className="flex items-center justify-center py-32">
+          <Loader2 className="w-10 h-10 animate-spin text-cyan-400/50" />
         </div>
       ) : expenses && expenses.length > 0 ? (
-        <FadeContent duration={600}>
-          <div className="space-y-4">
-            {expenses.map((expense) => (
-              <div key={expense.id} className="glass p-4 rounded-2xl flex items-center gap-4 border-none">
-                <div className="h-12 w-12 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary shrink-0">
-                  {categoryIcons[expense.category as ExpenseCategory]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-text-primary font-bold truncate">{expense.title}</h3>
-                  <p className="text-xs text-text-secondary">
-                    {format(new Date(expense.expense_date), 'M月d日')} • {expense.payer?.display_name} 支付
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-mono font-bold text-text-primary">
-                    {(Number(expense.amount) / 100).toFixed(2)}
-                  </p>
-                  <p className="text-[10px] text-text-muted uppercase font-bold">{currentTrip?.currency}</p>
+        <div className="space-y-4">
+          {expenses.map((expense) => (
+            <div key={expense.id} className="glass-card flex items-center gap-4 sm:gap-6 group cursor-default">
+              <div className="w-14 h-14 rounded-[20px] bg-white shadow-sm flex items-center justify-center text-cyan-600 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:bg-cyan-50">
+                {categoryIcons[expense.category as ExpenseCategory]}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <h3 className="text-slate-800 font-bold text-lg truncate mb-1">{expense.title}</h3>
+                <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                  <span>{format(new Date(expense.expense_date), 'M月d日')}</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300" />
+                  <span className="truncate">{expense.payer?.display_name} 支付</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </FadeContent>
+              
+              <div className="text-right">
+                <p className="text-2xl sm:text-3xl font-mono font-black text-slate-800 tracking-tighter">
+                  {(Number(expense.amount) / 100).toFixed(2)}
+                </p>
+                <p className="text-[11px] text-cyan-600 font-bold uppercase tracking-widest">{currentTrip?.currency}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="text-center py-20 glass rounded-3xl border-none">
-          <p className="text-text-muted mb-4">暂无账单记录</p>
+        <div className="text-center py-32 glass-panel rounded-[40px] border-dashed border-2 border-slate-200">
+          <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <ReceiptText className="w-10 h-10 text-slate-300" />
+          </div>
+          <p className="text-slate-400 font-bold text-lg mb-8 uppercase tracking-widest">暂无开支记录</p>
           <button
             onClick={() => setShowAddForm(true)}
-            className="text-accent-primary font-bold hover:underline"
+            className="text-cyan-600 font-bold hover:underline underline-offset-8 decoration-2"
           >
-            记录第一笔开支
+            开始记录第一笔 →
           </button>
         </div>
       )}

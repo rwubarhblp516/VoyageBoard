@@ -1,6 +1,6 @@
 import { Trip } from '@/types/trip'
-import SpotlightCard from '@/components/SpotlightCard'
-import { MapPin, Calendar } from 'lucide-react'
+import TiltedCard from '@/components/TiltedCard'
+import { MapPin, Calendar, ArrowUpRight } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface TripCardProps {
@@ -10,33 +10,48 @@ interface TripCardProps {
 
 export default function TripCard({ trip, onClick }: TripCardProps) {
   return (
-    <div onClick={onClick}>
-      <SpotlightCard
-        className="glass p-6 rounded-3xl cursor-pointer hover:border-accent-primary/50 transition-all border-none"
-        spotlightColor="rgba(14, 165, 233, 0.1)"
-      >
-      <div className="flex flex-col h-full">
-        <h3 className="text-xl font-bold text-text-primary mb-2">{trip.title}</h3>
-        
-        <div className="flex items-center gap-2 text-text-secondary text-sm mb-1">
-          <MapPin className="h-4 w-4 text-accent-primary" />
-          <span>{trip.destination}</span>
-        </div>
-        
-        <div className="flex items-center gap-2 text-text-secondary text-sm">
-          <Calendar className="h-4 w-4 text-accent-primary" />
-          <span>
-            {format(new Date(trip.start_date), 'MMM d日')} - {format(new Date(trip.end_date), 'MMM d日, yyyy年')}
-          </span>
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <span className="text-xs font-mono text-accent-primary bg-accent-primary/10 px-2 py-1 rounded-full font-bold">
-            {trip.currency}
-          </span>
-        </div>
-      </div>
-    </SpotlightCard>
+    <div onClick={onClick} className="group cursor-pointer">
+      <TiltedCard
+        imageSrc={trip.cover_image || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=800&auto=format&fit=crop'}
+        altText={trip.title}
+        captionText={trip.destination}
+        containerHeight="260px"
+        containerWidth="100%"
+        imageHeight="260px"
+        imageWidth="100%"
+        rotateAmplitude={12}
+        scaleOnHover={1.05}
+        showMobileWarning={false}
+        showTooltip={false}
+        displayOverlayContent={true}
+        overlayContent={
+          <div className="absolute inset-0 p-6 flex flex-col justify-end text-white w-full h-full bg-gradient-to-t from-black/80 via-black/20 to-transparent rounded-[15px]">
+            <div className="flex items-center justify-between gap-2 mb-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-500">
+               <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/30">
+                <Calendar className="h-3 w-3 text-accent-secondary" />
+                {trip.start_date ? format(new Date(trip.start_date), 'MM.dd') : '待定'}
+               </div>
+               <div className="h-8 w-8 bg-accent-primary rounded-full flex items-center justify-center shadow-lg transform rotate-45 group-hover:rotate-0 transition-transform duration-500">
+                <ArrowUpRight className="h-4 w-4 text-white" />
+               </div>
+            </div>
+            
+            <h3 className="text-2xl font-black tracking-tight drop-shadow-md mb-1 line-clamp-1">{trip.title}</h3>
+            
+            <div className="flex items-center gap-1 text-white/90 text-sm font-bold">
+              <MapPin className="h-3 w-3 text-accent-secondary" />
+              <span className="truncate">{trip.destination}</span>
+            </div>
+          </div>
+        }
+      />
     </div>
   )
+}
+
+// 补充类型定义兼容性
+declare module '@/types/trip' {
+  interface Trip {
+    cover_image?: string;
+  }
 }

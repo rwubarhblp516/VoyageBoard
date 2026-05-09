@@ -2,88 +2,110 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource/outfit";
 
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Heavy.woff2') format('woff2');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --color-bg-base: #F8FAFC;
+  --color-bg-base: #120F17;
   
-  /* 品牌色系：阳光浅滩 */
-  --color-accent-blue: #0284C7;
-  --color-accent-cyan: #06B6D4;
-  --color-accent-sun: #F59E0B;
-  --color-accent-coral: #F43F5E;
+  /* 简约专业色系 */
+  --color-accent-blue: #38BDF8;
+  --color-accent-cyan: #22D3EE;
+  --color-accent-sun: #FBBF24;
+  --color-accent-coral: #FB7185;
 
-  --color-text-main: #0F172A; 
-  --color-text-sub: #64748B; 
-  --color-text-light: #94A3B8; 
+  --color-text-main: #F1F5F9; 
+  --color-text-sub: #94A3B8; 
+  --color-text-light: #64748B; 
 
-  --font-sans: "Outfit", "Geist Variable", "PingFang SC", system-ui, sans-serif;
+  /* 兼容性别名 */
+  --color-text-primary: var(--color-text-main);
+  --color-text-secondary: var(--color-text-sub);
+  --color-text-muted: var(--color-text-light);
+  --color-accent-primary: var(--color-accent-blue);
+  --color-accent-secondary: var(--color-accent-cyan);
+  --color-accent-danger: var(--color-accent-coral);
+  --color-accent-success: #10B981;
+
+  --font-sans: "MiSans", "Outfit", "Geist Variable", "PingFang SC", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
 @layer base {
   body {
-    background-color: var(--color-bg-base);
-    color: var(--color-text-main);
-    min-height: 100vh;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.02em;
+    @apply bg-bg-base text-text-primary antialiased;
   }
 }
 
 @layer components {
-  /* 顶级毛玻璃拟态 */
-  .glass-panel {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.3) 100%);
+  /* 极简玻璃拟态 */
+  .glass {
+    background: rgba(18, 15, 23, 0.6);
     backdrop-filter: blur(24px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-    border-right: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px 0 rgba(2, 132, 199, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
   }
 
   .glass-card {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.3) 100%);
-    backdrop-filter: blur(24px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-    border-right: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px 0 rgba(2, 132, 199, 0.04);
-    border-radius: 2rem;
-    padding: 1.5rem;
-    transition: all 0.5s ease;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(40px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 
+      0 20px 50px rgba(0, 0, 0, 0.3),
+      inset 0 1px 1px rgba(255, 255, 255, 0.05);
   }
-  @media (min-width: 640px) {
-    .glass-card { padding: 2rem; }
+
+  .glass-strong {
+    background: rgba(18, 15, 23, 0.8);
+    backdrop-filter: blur(30px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.5);
   }
-  .glass-card:hover { background-color: rgba(255, 255, 255, 0.5); }
 
   /* 输入框 */
   .glass-input {
-    @apply w-full bg-white/40 border border-white/60 rounded-2xl py-4 px-5 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:bg-white/80 focus:border-cyan-400/50 focus:ring-4 focus:ring-cyan-400/10 transition-all duration-300 font-medium;
+    @apply w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-5 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:bg-white/10 focus:border-accent-blue/50 focus:ring-4 focus:ring-accent-blue/10 transition-all duration-300 font-medium;
   }
 
   /* 按钮 */
   .btn-primary {
-    @apply relative overflow-hidden bg-slate-900 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-500 hover:bg-slate-800 hover:shadow-[0_12px_24px_-8px_rgba(15,23,42,0.4)] active:scale-[0.97] flex items-center justify-center gap-2;
+    @apply relative overflow-hidden bg-white text-slate-950 font-bold py-4 px-8 rounded-2xl transition-all duration-500 hover:bg-slate-100 hover:shadow-[0_12px_24px_-8px_rgba(255,255,255,0.3)] active:scale-[0.97] flex items-center justify-center gap-2;
   }
   
   .btn-accent {
-    @apply relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-500 hover:shadow-[0_12px_24px_-8px_rgba(6,182,212,0.5)] active:scale-[0.97] flex items-center justify-center gap-2;
+    @apply relative overflow-hidden bg-gradient-to-r from-accent-blue to-blue-600 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-500 hover:shadow-[0_12px_24px_-8px_rgba(56,189,248,0.4)] active:scale-[0.97] flex items-center justify-center gap-2;
   }
 
   /* 隐藏滚动条 */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
-
-/* 自定义背景流动动画 */
-@keyframes mesh {
-  0% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(5%, 5%) scale(1.05); }
-  66% { transform: translate(-5%, 2%) scale(0.95); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-
-.bg-mesh-1 { animation: mesh 20s ease-in-out infinite alternate; }
-.bg-mesh-2 { animation: mesh 25s ease-in-out infinite alternate-reverse; }
-.bg-mesh-3 { animation: mesh 30s ease-in-out infinite alternate; }

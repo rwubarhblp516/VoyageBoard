@@ -118,19 +118,19 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
   ]
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-900/20 backdrop-blur-sm">
-      <div className="w-full max-w-lg glass-strong rounded-t-3xl sm:rounded-3xl p-8 shadow-2xl animate-in slide-in-from-bottom duration-300 border-none">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+      <div className="w-full max-w-lg glass-strong rounded-t-3xl sm:rounded-3xl p-8 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom duration-300 border-white/5">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-text-primary">记录支出</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200/50 rounded-full transition-colors">
-            <X className="h-6 w-6 text-text-muted" />
+          <h2 className="text-2xl font-bold text-white">记录支出</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <X className="h-6 w-6 text-slate-400" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-text-muted uppercase tracking-wider">金额</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">金额</label>
               <input
                 {...register('amount')}
                 type="number"
@@ -140,7 +140,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-text-muted uppercase tracking-wider">支出项</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">支出项</label>
               <input
                 {...register('title')}
                 placeholder="如：海鲜大餐"
@@ -150,7 +150,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-text-muted uppercase tracking-wider">分类</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">分类</label>
             <select
               {...register('category')}
               className="glass-input w-full appearance-none"
@@ -160,7 +160,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-text-muted uppercase tracking-wider">付款人</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">付款人</label>
             <select
               {...register('payer_member_id')}
               className="glass-input w-full appearance-none"
@@ -171,11 +171,13 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-text-muted uppercase tracking-wider">参与成员 (平摊)</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">参与成员 (平摊)</label>
             <div className="grid grid-cols-2 gap-2">
               {members?.map(m => (
                 <label key={m.id} className={`flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer ${
-                  selectedParticipants.includes(m.id) ? 'bg-accent-primary/10 border-accent-primary text-accent-primary' : 'bg-white/40 border-white/60 text-text-muted'
+                  selectedParticipants.includes(m.id) 
+                    ? 'bg-accent-blue/20 border-accent-blue text-accent-blue shadow-[0_0_15px_rgba(56,189,248,0.1)]' 
+                    : 'bg-slate-900/50 border-white/5 text-slate-400'
                 }`}>
                   <input
                     type="checkbox"

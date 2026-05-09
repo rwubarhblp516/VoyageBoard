@@ -47,8 +47,8 @@ export default function ExpenseListPage() {
       
       <header className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-6">
         <div>
-          <h1 className="text-4xl sm:text-5xl font-black text-slate-800 tracking-tight mb-2">记账账单</h1>
-          <p className="text-slate-500 font-medium">清楚记录，享受每一次探索。</p>
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">记账账单</h1>
+          <p className="text-slate-400 font-medium">清楚记录，享受每一次探索。</p>
         </div>
         
         <button
@@ -68,37 +68,37 @@ export default function ExpenseListPage() {
         <div className="space-y-4">
           {expenses.map((expense) => (
             <div key={expense.id} className="glass-card flex items-center gap-4 sm:gap-6 group cursor-default">
-              <div className="w-14 h-14 rounded-[20px] bg-white shadow-sm flex items-center justify-center text-cyan-600 shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:bg-cyan-50">
+              <div className="w-14 h-14 rounded-[20px] bg-slate-900 shadow-xl flex items-center justify-center text-cyan-400 shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-slate-800 border border-white/5">
                 {categoryIcons[expense.category as ExpenseCategory]}
               </div>
               
               <div className="flex-1 min-w-0">
-                <h3 className="text-slate-800 font-bold text-lg truncate mb-1">{expense.title}</h3>
-                <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                <h3 className="text-white font-bold text-lg truncate mb-1">{expense.title}</h3>
+                <div className="flex items-center gap-2 text-sm text-slate-400 font-medium">
                   <span>{format(new Date(expense.expense_date), 'M月d日')}</span>
-                  <span className="w-1 h-1 rounded-full bg-slate-300" />
+                  <span className="w-1 h-1 rounded-full bg-slate-600" />
                   <span className="truncate">{expense.payer?.display_name} 支付</span>
                 </div>
               </div>
               
               <div className="text-right">
-                <p className="text-2xl sm:text-3xl font-mono font-black text-slate-800 tracking-tighter">
+                <p className="text-2xl sm:text-3xl font-mono font-black text-white tracking-tighter">
                   {(Number(expense.amount) / 100).toFixed(2)}
                 </p>
-                <p className="text-[11px] text-cyan-600 font-bold uppercase tracking-widest">{currentTrip?.currency}</p>
+                <p className="text-[11px] text-cyan-400 font-bold uppercase tracking-widest">{currentTrip?.currency}</p>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="text-center py-32 glass-panel rounded-[40px] border-dashed border-2 border-slate-200">
-          <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-            <ReceiptText className="w-10 h-10 text-slate-300" />
+        <div className="text-center py-32 glass-panel rounded-[40px] border-dashed border-2 border-white/10">
+          <div className="bg-slate-900 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl border border-white/5">
+            <ReceiptText className="w-10 h-10 text-slate-500" />
           </div>
           <p className="text-slate-400 font-bold text-lg mb-8 uppercase tracking-widest">暂无开支记录</p>
           <button
             onClick={() => setShowAddForm(true)}
-            className="text-cyan-600 font-bold hover:underline underline-offset-8 decoration-2"
+            className="text-cyan-400 font-bold hover:underline underline-offset-8 decoration-2"
           >
             开始记录第一笔 →
           </button>

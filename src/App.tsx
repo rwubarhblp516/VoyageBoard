@@ -55,32 +55,53 @@ function TripDashboard() {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-text-primary">{currentTrip.title}</h1>
-      <p className="text-text-secondary mt-1">{currentTrip.destination}</p>
-      
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="glass p-6 rounded-3xl h-40 flex flex-col justify-center">
-          <span className="text-text-muted text-xs uppercase font-bold tracking-wider">当前目的地</span>
-          <span className="text-2xl font-bold text-text-primary mt-1">{currentTrip.destination}</span>
-        </div>
-        <div className="glass p-6 rounded-3xl h-40 flex flex-col justify-center">
-          <span className="text-text-muted text-xs uppercase font-bold tracking-wider">结算货币</span>
-          <span className="text-3xl font-mono font-bold text-accent-primary mt-1">{currentTrip.currency}</span>
-        </div>
-        <div className="glass p-6 rounded-3xl h-40 flex flex-col justify-center">
-          <span className="text-text-muted text-xs uppercase font-bold tracking-wider">旅程状态</span>
-          <span className="text-xl font-bold text-accent-success mt-1">进行中</span>
+    <FadeContent blur={true} duration={800}>
+      <div className="py-12 md:py-20">
+        <header className="mb-20 space-y-4">
+          <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter">
+            {currentTrip.title}
+          </h1>
+          <div className="flex items-center gap-4 text-slate-400 font-bold tracking-widest text-xs uppercase opacity-60">
+            <span>{currentTrip.destination}</span>
+            <span>·</span>
+            <span>{currentTrip.currency}</span>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="glass-card p-10 rounded-[40px] flex flex-col justify-between h-56 group hover:-translate-y-1 transition-all duration-500">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">总支出</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-5xl font-black text-white tracking-tighter">0.00</span>
+              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">{currentTrip.currency}</span>
+            </div>
+          </div>
+
+          <div className="glass-card p-10 rounded-[40px] flex flex-col justify-between h-56 group hover:-translate-y-1 transition-all duration-500">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">待结算</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-5xl font-black text-white tracking-tighter">0.00</span>
+              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">{currentTrip.currency}</span>
+            </div>
+          </div>
+
+          <div className="glass-card p-10 rounded-[40px] flex flex-col justify-between h-56 group hover:-translate-y-1 transition-all duration-500">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">旅程状态</span>
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+              <span className="text-2xl font-black text-white tracking-tight">活跃中</span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </FadeContent>
   )
 }
 
 const Itinerary = () => (
   <div className="py-8">
     <h1 className="text-3xl font-bold text-text-primary">行程规划</h1>
-    <p className="text-text-secondary mt-1 italic">正在规划您的精彩冒险...</p>
+    <p className="text-text-secondary mt-1 italic">为您规划更高效的路线...</p>
     <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
       <p className="text-text-muted">行程管理功能即将上线。</p>
     </div>
@@ -90,7 +111,7 @@ const Itinerary = () => (
 const Members = () => (
   <div className="py-8">
     <h1 className="text-3xl font-bold text-text-primary">成员管理</h1>
-    <p className="text-text-secondary mt-1 italic">管理您的旅行伙伴...</p>
+    <p className="text-text-secondary mt-1 italic">管理您的旅程成员...</p>
     <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
       <p className="text-text-muted">成员邀请与角色管理即将上线。</p>
     </div>
@@ -113,7 +134,7 @@ const Settings = () => {
           }}
           className="w-full text-left glass p-5 rounded-2xl text-text-primary font-semibold hover:bg-white/60 transition-all flex items-center justify-between"
         >
-          <span>切换旅行项目</span>
+          <span>切换旅行旅程</span>
           <ArrowLeft className="h-5 w-5 rotate-180 text-accent-primary" />
         </button>
         <button
@@ -138,7 +159,7 @@ function App() {
           <div className="min-h-screen text-text-primary">
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              
+
               <Route path="/trips" element={
                 <ProtectedRoute>
                   <div className="max-w-5xl mx-auto px-4">

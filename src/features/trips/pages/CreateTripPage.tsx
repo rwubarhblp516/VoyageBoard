@@ -69,15 +69,15 @@ export default function CreateTripPage() {
   }
 
   return (
-    <div className="relative min-h-screen">
-      {/* 极简高级背景 */}
-      <div className="fixed inset-0 z-0 bg-bg-base">
-        <LightPillar
-          intensity={0.6}
-          rotationSpeed={0.3}
+    <div className="relative min-h-screen bg-[#0A0A0B] select-none">
+       {/* 调优版背景：保留光柱质感，但极其缓慢且柔和 */}
+       <div className="fixed inset-0 z-0">
+        <LightPillar 
+          intensity={0.3} 
+          rotationSpeed={0.05} 
           pillarRotation={25}
           pillarHeight={0.4}
-          pillarWidth={2.5}
+          pillarWidth={2.8}
           noiseIntensity={0}
         />
       </div>
@@ -85,7 +85,7 @@ export default function CreateTripPage() {
       <div className="relative z-10 max-w-2xl mx-auto px-6 py-16 md:py-24">
         <button
           onClick={() => navigate('/trips')}
-          className="group inline-flex items-center gap-2 text-slate-500 hover:text-white transition-all mb-12 font-black text-xs uppercase tracking-widest"
+          className="group inline-flex items-center gap-2 text-white/40 hover:text-white transition-all mb-12 font-black text-xs uppercase tracking-widest"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
           返回列表
@@ -94,18 +94,15 @@ export default function CreateTripPage() {
         <FadeContent duration={600} blur={true}>
           <div className="space-y-2 mb-12">
             <h1 className="text-5xl font-black text-white tracking-tighter">
-              开启新旅程
+              开启新项目
             </h1>
-            <p className="text-slate-400 font-medium text-lg italic opacity-80">
-              为您的下一次集体旅行建立一个专业的账本空间。
-            </p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-10 rounded-[40px] space-y-8">
             <div className="space-y-3">
-              <label className="text-xs font-black text-slate-200 ml-1 uppercase tracking-widest">旅程标题</label>
+              <label className="text-xs font-black text-white/60 ml-1 uppercase tracking-widest">项目标题</label>
               <div className="relative group">
-                <Flag className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-accent-blue transition-colors" />
+                <Flag className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/20 group-focus-within:text-white transition-colors" />
                 <input
                   {...register('title')}
                   placeholder="例如：2026 夏日冲绳之旅"
@@ -116,9 +113,9 @@ export default function CreateTripPage() {
             </div>
 
             <div className="space-y-3">
-              <label className="text-xs font-black text-slate-200 ml-1 uppercase tracking-widest">目的地</label>
+              <label className="text-xs font-black text-white/60 ml-1 uppercase tracking-widest">目的地</label>
               <div className="relative group">
-                <Globe className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500 group-focus-within:text-accent-blue transition-colors" />
+                <Globe className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/20 group-focus-within:text-white transition-colors" />
                 <input
                   {...register('destination')}
                   placeholder="例如：冲绳，日本"
@@ -130,7 +127,7 @@ export default function CreateTripPage() {
 
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-200 ml-1 uppercase tracking-widest">开始日期</label>
+                <label className="text-xs font-black text-white/60 ml-1 uppercase tracking-widest">开始日期</label>
                 <input
                   type="date"
                   {...register('start_date')}
@@ -138,7 +135,7 @@ export default function CreateTripPage() {
                 />
               </div>
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-200 ml-1 uppercase tracking-widest">结束日期</label>
+                <label className="text-xs font-black text-white/60 ml-1 uppercase tracking-widest">结束日期</label>
                 <input
                   type="date"
                   {...register('end_date')}
@@ -148,9 +145,9 @@ export default function CreateTripPage() {
             </div>
 
             <div className="space-y-3">
-              <label className="text-xs font-black text-slate-200 ml-1 uppercase tracking-widest">结算货币</label>
+              <label className="text-xs font-black text-white/60 ml-1 uppercase tracking-widest">结算货币</label>
               <div className="relative group">
-                <Landmark className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+                <Landmark className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-white/20" />
                 <select
                   {...register('currency')}
                   className="glass-input w-full pl-14 appearance-none"
@@ -166,12 +163,12 @@ export default function CreateTripPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn-accent w-full h-16 group mt-4 shadow-[0_20px_40px_rgba(56,189,248,0.15)]"
+              className="btn-primary w-full h-16 group mt-4 shadow-[0_20px_40px_rgba(255,255,255,0.05)]"
             >
               {isSubmitting ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <span className="tracking-[0.2em] font-black">立即创建旅程</span>
+                <span className="tracking-[0.2em] font-black">立即创建项目</span>
               )}
             </button>
           </form>

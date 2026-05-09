@@ -5,6 +5,7 @@ import {
   Settings as SettingsIcon, 
   Users,
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import LightPillar from '@/components/LightPillar'
 
 export default function MainLayout() {
@@ -19,12 +20,12 @@ export default function MainLayout() {
   ]
 
   return (
-    <div className="relative min-h-screen bg-bg-base text-slate-200 font-sans selection:bg-accent-blue/30 selection:text-white">
-      {/* 极简高级背景 */}
+    <div className="relative min-h-screen bg-bg-base text-slate-200 font-sans selection:bg-white/10 selection:text-white">
+      {/* 还原高保真背景：通透、明亮、动感 */}
       <div className="fixed inset-0 z-0">
         <LightPillar 
-          intensity={0.5} 
-          rotationSpeed={0.3} 
+          intensity={1.2} 
+          rotationSpeed={0.5} 
           pillarRotation={25}
           pillarHeight={0.4}
           pillarWidth={2.2}
@@ -39,7 +40,11 @@ export default function MainLayout() {
 
       {/* 极简高级底部导航 (Dock Style) */}
       <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
-        <div className="glass px-4 py-3 rounded-[32px] flex items-center gap-2 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+        <motion.div 
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="glass px-4 py-3 rounded-[32px] flex items-center gap-2 border-white/5 shadow-[0_30px_100px_rgba(0,0,0,0.8)]"
+        >
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.id || (item.id !== '/' && location.pathname.startsWith(item.id))
@@ -59,12 +64,15 @@ export default function MainLayout() {
                   {item.label}
                 </span>
                 {isActive && (
-                  <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-slate-950 rounded-full" />
+                  <motion.div 
+                    layoutId="nav-dot"
+                    className="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-slate-950 rounded-full" 
+                  />
                 )}
               </button>
             )
           })}
-        </div>
+        </motion.div>
       </nav>
     </div>
   )

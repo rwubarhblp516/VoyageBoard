@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, ChevronRight } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useTripStore } from '@/stores/useTripStore'
@@ -41,14 +41,14 @@ export default function TripListPage() {
 
   return (
     <div className="relative min-h-screen bg-bg-base select-none">
-      {/* 极简高级背景 */}
+      {/* 还原高保真背景：通透、明亮、动感 */}
       <div className="fixed inset-0 z-0">
-        <LightPillar
-          intensity={0.6}
-          rotationSpeed={0.3}
+        <LightPillar 
+          intensity={1.2} 
+          rotationSpeed={0.5} 
           pillarRotation={25}
           pillarHeight={0.4}
-          pillarWidth={2.5}
+          pillarWidth={2.2}
           noiseIntensity={0}
         />
       </div>
@@ -79,33 +79,34 @@ export default function TripListPage() {
                   whileTap={{ scale: 0.98 }}
                   className="group relative cursor-pointer"
                 >
-                  <div className={`glass-card p-8 rounded-[40px] h-full transition-all duration-500 border-white/5 ${hoveredId === trip.id ? 'border-white/20 bg-white/5 -translate-y-2 shadow-[0_30px_60px_rgba(0,0,0,0.4)]' : ''
-                    }`}>
+                  <div className={`glass-card p-8 rounded-[40px] h-full transition-all duration-500 border-white/5 ${
+                    hoveredId === trip.id ? 'border-white/10 bg-white/5 -translate-y-2 shadow-[0_30px_60px_rgba(0,0,0,0.6)]' : ''
+                  }`}>
                     <div className="flex justify-between items-start mb-10">
-                      <span className="text-[10px] font-black text-white/30 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                      <span className="text-[10px] font-black text-white/20 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
                         {trip.currency}
                       </span>
                     </div>
-
-                    <h3 className="text-2xl font-black text-white/90 mb-2 tracking-tight">
+                    
+                    <h3 className="text-2xl font-black text-white/90 mb-2 tracking-tight group-hover:text-white transition-colors">
                       {trip.title}
                     </h3>
-                    <p className="text-white/40 font-medium text-sm">
+                    <p className="text-white/30 font-medium text-sm">
                       {trip.destination}
                     </p>
-
+                    
                     <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Open</span>
-                      <ChevronRight className="h-4 w-4 text-white/30" />
+                      <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Open</span>
+                      <ChevronRight className="h-4 w-4 text-white/20" />
                     </div>
                   </div>
                 </motion.div>
               ))}
             </div>
           ) : (
-            /* 极简空状态 */
-            <div className="flex flex-col items-center justify-center py-40">
-              <h2 className="text-2xl font-black text-white/20 tracking-tighter">待添加</h2>
+            /* 精致卡牌空状态 */
+            <div className="flex flex-col items-center justify-center py-32 glass-card rounded-[40px] border-dashed border-white/10">
+              <h2 className="text-2xl font-black text-white/40 tracking-tighter">待添加</h2>
             </div>
           )}
         </FadeContent>
@@ -115,22 +116,21 @@ export default function TripListPage() {
       <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50">
         <motion.button
           onClick={() => navigate('/trips/new')}
-          whileHover={{
+          whileHover={{ 
             scale: 1.1,
-            boxShadow: "0 20px 40px rgba(255,255,255,0.2)"
+            boxShadow: "0 20px 40px rgba(255,255,255,0.15)"
           }}
           whileTap={{ scale: 0.9 }}
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{
+          transition={{ 
             type: "spring",
             stiffness: 260,
             damping: 20
           }}
-          className="w-20 h-20 bg-white text-slate-950 rounded-full flex items-center justify-center shadow-[0_15px_30px_rgba(0,0,0,0.3)] group overflow-hidden relative"
+          className="w-20 h-20 bg-white text-slate-950 rounded-full flex items-center justify-center shadow-[0_15px_40px_rgba(0,0,0,0.5)] group overflow-hidden relative"
         >
-          {/* 微光动画效果 */}
-          <motion.div
+          <motion.div 
             className="absolute inset-0 bg-gradient-to-tr from-white via-slate-100 to-white opacity-0 group-hover:opacity-100 transition-opacity duration-500"
           />
           <Plus className="h-8 w-8 relative z-10" />

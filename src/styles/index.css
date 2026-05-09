@@ -36,76 +36,59 @@
 
 @theme {
   --color-bg-base: #120F17;
-  
-  /* 简约专业色系 */
   --color-accent-blue: #38BDF8;
   --color-accent-cyan: #22D3EE;
   --color-accent-sun: #FBBF24;
   --color-accent-coral: #FB7185;
-
   --color-text-main: #F1F5F9; 
   --color-text-sub: #94A3B8; 
-  --color-text-light: #64748B; 
-
-  /* 兼容性别名 */
-  --color-text-primary: var(--color-text-main);
-  --color-text-secondary: var(--color-text-sub);
-  --color-text-muted: var(--color-text-light);
-  --color-accent-primary: var(--color-accent-blue);
-  --color-accent-secondary: var(--color-accent-cyan);
-  --color-accent-danger: var(--color-accent-coral);
-  --color-accent-success: #10B981;
-
   --font-sans: "MiSans", "Outfit", "Geist Variable", "PingFang SC", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
 }
 
 @layer base {
-  body {
-    @apply bg-bg-base text-text-primary antialiased;
-  }
+  body { @apply bg-bg-base text-text-main antialiased; }
 }
 
 @layer components {
-  /* 极简玻璃拟态 */
-  .glass {
-    background: rgba(18, 15, 23, 0.6);
-    backdrop-filter: blur(24px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-  }
-
   .glass-card {
     background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(40px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 
-      0 20px 50px rgba(0, 0, 0, 0.3),
-      inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
   }
 
-  .glass-strong {
-    background: rgba(18, 15, 23, 0.8);
-    backdrop-filter: blur(30px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.5);
-  }
-
-  /* 输入框 */
   .glass-input {
     @apply w-full bg-black/20 backdrop-blur-xl border border-white/10 rounded-2xl py-4 px-5 text-white placeholder:text-white/50 focus:outline-none focus:bg-black/40 focus:border-white/30 transition-all duration-300 font-bold;
   }
 
-  /* 按钮 */
   .btn-primary {
-    @apply relative overflow-hidden bg-white text-slate-950 font-bold py-4 px-8 rounded-2xl transition-all duration-500 hover:bg-slate-100 hover:shadow-[0_12px_24px_-8px_rgba(255,255,255,0.3)] active:scale-[0.97] flex items-center justify-center gap-2;
-  }
-  
-  .btn-accent {
-    @apply relative overflow-hidden bg-gradient-to-r from-accent-blue to-blue-600 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-500 hover:shadow-[0_12px_24px_-8px_rgba(56,189,248,0.4)] active:scale-[0.97] flex items-center justify-center gap-2;
+    @apply relative overflow-hidden bg-white/10 backdrop-blur-xl border border-white/20 text-white font-black py-5 px-8 rounded-[24px] transition-all duration-500 hover:bg-white hover:text-slate-950 hover:shadow-[0_20px_40px_rgba(255,255,255,0.1)] active:scale-[0.98] flex items-center justify-center gap-3 tracking-[0.2em] text-sm uppercase;
   }
 
-  /* 隐藏滚动条 */
+  /* 3D Wheel Picker Styles */
+  .ios-picker-container {
+    perspective: 1000px;
+    @apply relative h-64 w-full flex overflow-hidden select-none;
+  }
+
+  .ios-picker-column {
+    @apply flex-1 relative overflow-y-scroll no-scrollbar snap-y snap-mandatory;
+    scroll-behavior: smooth;
+  }
+
+  .ios-picker-item {
+    @apply h-12 flex items-center justify-center snap-center text-lg font-bold transition-all duration-300 origin-center;
+    transform-style: preserve-3d;
+  }
+
+  .ios-picker-mask {
+    background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.2) 55%, rgba(0,0,0,0.9) 100%);
+    @apply absolute inset-0 pointer-events-none z-10;
+  }
+
+  .ios-picker-highlight {
+    @apply absolute top-1/2 left-0 right-0 h-12 -translate-y-1/2 bg-white/5 border-y border-white/10 pointer-events-none z-0 rounded-xl;
+  }
+
   .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }

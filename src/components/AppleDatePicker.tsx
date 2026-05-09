@@ -11,14 +11,19 @@ interface AppleDatePickerProps {
 
 export default function AppleDatePicker({ isOpen, onClose, value, onChange }: AppleDatePickerProps) {
   const currentYear = useMemo(() => new Date().getFullYear(), [])
-  
-  // Create a dynamic range centered around current year
   const years = useMemo(() => Array.from({ length: 101 }, (_, i) => (currentYear - 50) + i), [currentYear])
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), [])
   
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [selectedDay, setSelectedDay] = useState(new Date().getDate())
+  // Use a helper to parse the date safely
+  const getInitialDate = () => {
+    if (!value) return new Date()
+    const d = new Date(value)
+    return isNaN(d.getTime()) ? new Date() : d
+  }
+
+  const [selectedYear, setSelectedYear] = useState(getInitialDate().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(getInitialDate().getMonth() + 1)
+  const [selectedDay, setSelectedDay] = useState(getInitialDate().getDate())
 
   const days = useMemo(() => {
     const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate()
@@ -39,42 +44,37 @@ export default function AppleDatePicker({ isOpen, onClose, value, onChange }: Ap
     }
   }
 
-  const isInitialOpen = useRef(true)
+  // Use a ref to track the last opened state to detect transition from closed to open
+  const prevOpenRef = useRef(isOpen)
 
   useEffect(() => {
-    if (isOpen) {
-      if (isInitialOpen.current) {
-        // Only sync from 'value' prop on the very first open moment
-        const date = value ? new Date(value) : new Date()
-        const y = date.getFullYear()
-        const m = date.getMonth() + 1
-        const d = date.getDate()
+    // Only trigger sync when transitioning from closed to open
+    if (isOpen && !prevOpenRef.current) {
+      const date = getInitialDate()
+      const y = date.getFullYear()
+      const m = date.getMonth() + 1
+      const d = date.getDate()
 
-        setSelectedYear(y)
-        setSelectedMonth(m)
-        setSelectedDay(d)
+      setSelectedYear(y)
+      setSelectedMonth(m)
+      setSelectedDay(d)
 
-        const performSync = () => {
-          syncScroll(yearRef, years, y)
-          syncScroll(monthRef, months, m)
-          syncScroll(dayRef, days, d)
-        }
-
-        performSync()
-        const timer = setTimeout(performSync, 50)
-        const timer2 = setTimeout(performSync, 150)
-        
-        isInitialOpen.current = false
-        
-        return () => {
-          clearTimeout(timer)
-          clearTimeout(timer2)
-        }
+      // Use multiple attempts to ensure layout is ready and avoid being cancelled by re-renders
+      const attemptSync = () => {
+        syncScroll(yearRef, years, y)
+        syncScroll(monthRef, months, m)
+        syncScroll(dayRef, days, d)
       }
-    } else {
-      // Reset the flag when picker closes
-      isInitialOpen.current = true
+
+      // We don't clear these timers because we want them to complete even if the effect re-runs
+      // (which happens when selectedYear/Month updates the 'days' array)
+      setTimeout(attemptSync, 0)
+      setTimeout(attemptSync, 50)
+      setTimeout(attemptSync, 150)
+      setTimeout(attemptSync, 300)
     }
+    
+    prevOpenRef.current = isOpen
   }, [isOpen, value, years, months, days])
 
   const handleScroll = (ref: React.RefObject<HTMLDivElement | null>, items: number[], setter: (val: number) => void) => {

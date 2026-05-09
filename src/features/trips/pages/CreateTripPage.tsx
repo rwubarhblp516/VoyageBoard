@@ -11,6 +11,7 @@ import { useState } from 'react'
 import FadeContent from '@/components/FadeContent'
 import LightPillar from '@/components/LightPillar'
 import AppleDatePicker from '@/components/AppleDatePicker'
+import AppleSelect from '@/components/AppleSelect'
 import { Trip } from '@/types/trip'
 
 const tripSchema = z.object({
@@ -30,6 +31,7 @@ export default function CreateTripPage() {
 
   const [isStartDateOpen, setIsStartDateOpen] = useState(false)
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue } = useForm<TripForm>({
     resolver: zodResolver(tripSchema),
@@ -164,22 +166,35 @@ export default function CreateTripPage() {
 
             <div className="space-y-4">
               <label className="text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">结算货币</label>
-              <div className="relative">
-                <select
-                  {...register('currency')}
-                  className="glass-input w-full appearance-none cursor-pointer"
-                >
-                  <option value="CNY">CNY - 人民币</option>
-                  <option value="JPY">JPY - 日元</option>
-                  <option value="USD">USD - 美元</option>
-                  <option value="EUR">EUR - 欧元</option>
-                </select>
-                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none opacity-20">
+              <div 
+                onClick={() => setIsCurrencyOpen(true)}
+                className="glass-input w-full flex items-center justify-between cursor-pointer hover:bg-black/30 transition-colors"
+              >
+                <span className="font-bold">
+                  {watch('currency') === 'CNY' && 'CNY - 人民币'}
+                  {watch('currency') === 'JPY' && 'JPY - 日元'}
+                  {watch('currency') === 'USD' && 'USD - 美元'}
+                  {watch('currency') === 'EUR' && 'EUR - 欧元'}
+                </span>
+                <div className="opacity-20">
                   <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
                     <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                   </svg>
                 </div>
               </div>
+              <AppleSelect
+                isOpen={isCurrencyOpen}
+                onClose={() => setIsCurrencyOpen(false)}
+                title="结算货币"
+                value={watch('currency')}
+                onChange={(val) => setValue('currency', val)}
+                options={[
+                  { value: 'CNY', label: 'CNY - 人民币' },
+                  { value: 'JPY', label: 'JPY - 日元' },
+                  { value: 'USD', label: 'USD - 美元' },
+                  { value: 'EUR', label: 'EUR - 欧元' },
+                ]}
+              />
             </div>
 
             <motion.button

@@ -13,9 +13,10 @@ const expenseSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   amount: z.string().refine((v) => !isNaN(Number(v)) && Number(v) > 0, 'Amount must be positive'),
   category: z.string(),
-  payer_member_id: z.string(),
+  payer_member_id: z.string().min(1, 'Please select a payer'),
   expense_date: z.string(),
   participant_ids: z.array(z.string()).min(1, 'At least one participant required'),
+  split_type: z.enum(['equal', 'individual']),
 })
 
 type ExpenseForm = z.infer<typeof expenseSchema>
@@ -43,7 +44,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
     enabled: !!currentTrip,
   })
 
-  const { register, handleSubmit, watch, setValue, formState: { isSubmitting } } = useForm<ExpenseForm>({
+  const { register, handleSubmit, watch, setValue, formState: { isSubmitting, errors } } = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
     values: {
       title: '',
@@ -52,10 +53,23 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
       payer_member_id: '',
       expense_date: new Date().toISOString().split('T')[0],
       participant_ids: members?.map(m => m.id) || [],
+      split_type: 'equal',
     }
   })
 
   const selectedParticipants = watch('participant_ids') || []
+  const splitType = watch('split_type')
+  const payerId = watch('payer_member_id')
+
+  // Handle Split Type changes
+  const handleSplitTypeChange = (type: 'equal' | 'individual') => {
+    setValue('split_type', type)
+    if (type === 'individual' && payerId) {
+      setValue('participant_ids', [payerId])
+    } else if (type === 'equal') {
+      setValue('participant_ids', members?.map(m => m.id) || [])
+    }
+  }
 
   const onSubmit = async (values: ExpenseForm) => {
     if (!currentTrip || !user) return
@@ -80,7 +94,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
 
       if (expError) throw expError
 
-      // 2. Create Participants (Equal split for MVP)
+      // 2. Create Participants
       const shareAmount = Math.floor(amountInCents / values.participant_ids.length)
       const remainder = amountInCents % values.participant_ids.length
 
@@ -88,7 +102,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
         expense_id: expense.id,
         member_id: memberId,
         share_type: 'equal',
-        calculated_amount: shareAmount + (index === 0 ? remainder : 0) // First one takes the remainder
+        calculated_amount: shareAmount + (index === 0 ? remainder : 0)
       }))
 
       const { error: partError } = await supabase
@@ -107,12 +121,9 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
   const categories: { label: string, value: ExpenseCategory }[] = [
     { label: '餐饮', value: 'food' },
     { label: '住宿', value: 'hotel' },
-    { label: '加油', value: 'gas' },
-    { label: '停车', value: 'parking' },
-    { label: '过路费', value: 'toll' },
-    { label: '门票', value: 'ticket' },
+    { label: '交通', value: 'car_rental' },
+    { label: '机票', value: 'ticket' },
     { label: '购物', value: 'shopping' },
-    { label: '租车', value: 'car_rental' },
     { label: '娱乐', value: 'entertainment' },
     { label: '其他', value: 'other' },
   ]
@@ -171,17 +182,56 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">参与成员 (平摊)</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">分摊模式</label>
+            <div className="flex gap-2 p-1 bg-slate-900/50 rounded-xl border border-white/5">
+              <button
+                type="button"
+                onClick={() => handleSplitTypeChange('equal')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                  splitType === 'equal' 
+                    ? 'bg-white/10 text-white shadow-lg' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                AA 平摊
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSplitTypeChange('individual')}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                  splitType === 'individual' 
+                    ? 'bg-white/10 text-white shadow-lg' 
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                个人支付
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">参与成员</label>
+              {splitType === 'individual' && (
+                <span className="text-[10px] font-bold text-accent-blue uppercase tracking-wider">个人支付模式已锁定</span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2">
               {members?.map(m => (
-                <label key={m.id} className={`flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer ${
-                  selectedParticipants.includes(m.id) 
-                    ? 'bg-accent-blue/20 border-accent-blue text-accent-blue shadow-[0_0_15px_rgba(56,189,248,0.1)]' 
-                    : 'bg-slate-900/50 border-white/5 text-slate-400'
-                }`}>
+                <label 
+                  key={m.id} 
+                  className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
+                    splitType === 'individual' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  } ${
+                    selectedParticipants.includes(m.id) 
+                      ? 'bg-accent-blue/20 border-accent-blue text-accent-blue shadow-[0_0_15px_rgba(56,189,248,0.1)]' 
+                      : 'bg-slate-900/50 border-white/5 text-slate-400'
+                  }`}
+                >
                   <input
                     type="checkbox"
                     value={m.id}
+                    disabled={splitType === 'individual'}
                     checked={selectedParticipants.includes(m.id)}
                     onChange={(e) => {
                       const ids = e.target.checked 
@@ -195,6 +245,7 @@ export default function AddExpenseForm({ onClose, onSuccess }: AddExpenseFormPro
                 </label>
               ))}
             </div>
+            {errors.participant_ids && <p className="text-accent-coral text-[10px] mt-1 font-bold uppercase tracking-wider">{errors.participant_ids.message}</p>}
           </div>
 
           <button

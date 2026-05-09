@@ -14,8 +14,7 @@ export default function MainLayout() {
 
   const navItems = [
     { id: '/', icon: LayoutDashboard, label: '总览' },
-    { id: '/expenses', icon: Receipt, label: '支出' },
-    { id: '/members', icon: Users, label: '成员' },
+    { id: '/expenses', icon: Receipt, label: '记账' },
     { id: '/settings', icon: SettingsIcon, label: '设置' },
   ]
 
@@ -34,16 +33,30 @@ export default function MainLayout() {
       </div>
 
       {/* 内容区域 */}
-      <main className="relative z-10 max-w-5xl mx-auto px-6 pt-12 pb-40">
+      <main className="relative z-10 max-w-5xl mx-auto px-6 pt-12 pb-44">
         <Outlet />
       </main>
 
+      {/* 成员管理悬浮按钮 (FAB) */}
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => navigate('/members')}
+        className="fixed right-6 bottom-32 sm:right-12 sm:bottom-36 z-50 w-14 h-14 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl flex items-center justify-center text-white shadow-2xl group transition-all"
+      >
+        <div className="absolute inset-0 bg-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+        <Users className="h-6 w-6 relative z-10" />
+        <span className="absolute right-full mr-4 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-xl text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap pointer-events-none">
+          成员管理
+        </span>
+      </motion.button>
+
       {/* 极简高级底部导航 (Dock Style) */}
-      <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6">
         <motion.div 
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="glass px-4 py-3 rounded-[32px] flex items-center gap-2 border-white/5 shadow-[0_30px_100px_rgba(0,0,0,0.8)]"
+          className="glass px-2 py-2 rounded-[32px] flex items-center justify-around border-white/5 shadow-[0_30px_100px_rgba(0,0,0,0.8)]"
         >
           {navItems.map((item) => {
             const Icon = item.icon
@@ -53,20 +66,26 @@ export default function MainLayout() {
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`relative flex items-center gap-3 px-6 py-4 rounded-2xl transition-all duration-500 group ${
+                className={`relative flex flex-col items-center justify-center gap-1.5 w-24 py-3 rounded-2xl transition-all duration-500 group ${
                   isActive 
-                    ? 'bg-white text-slate-950 font-black shadow-[0_10px_20px_rgba(255,255,255,0.2)]' 
-                    : 'text-slate-500 hover:text-white hover:bg-white/5'
+                    ? 'text-white' 
+                    : 'text-white/30 hover:text-white/60'
                 }`}
               >
-                <Icon className={`h-5 w-5 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                <span className={`text-xs font-black tracking-widest transition-all duration-500 ${isActive ? 'w-auto opacity-100' : 'w-0 opacity-0 overflow-hidden hidden md:block group-hover:w-auto group-hover:opacity-100'}`}>
+                {isActive && (
+                  <motion.div 
+                    layoutId="nav-bg"
+                    className="absolute inset-0 bg-white/5 rounded-2xl border border-white/5" 
+                  />
+                )}
+                <Icon className={`h-5 w-5 relative z-10 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+                <span className={`text-[10px] font-bold tracking-[0.2em] relative z-10 transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
                   {item.label}
                 </span>
                 {isActive && (
                   <motion.div 
                     layoutId="nav-dot"
-                    className="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-slate-950 rounded-full" 
+                    className="absolute -bottom-1 w-1 h-1 bg-[#0A84FF] rounded-full shadow-[0_0_8px_#0A84FF]" 
                   />
                 )}
               </button>

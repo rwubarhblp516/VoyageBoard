@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useTripStore } from '@/stores/useTripStore'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import FadeContent from '@/components/FadeContent'
@@ -69,7 +69,7 @@ export default function CreateTripPage() {
       })
 
       setCurrentTrip(newTrip)
-      navigate('/')
+      navigate('/trips')
     } catch (error: any) {
       alert(error.message)
     }
@@ -96,42 +96,41 @@ export default function CreateTripPage() {
         />
       </div>
 
-      <div className="relative z-10 max-w-xl mx-auto px-6 py-16 md:py-24">
+      <div className="relative z-10 max-w-xl mx-auto px-6 py-10 md:py-16 pb-20">
         <button
           onClick={() => navigate('/trips')}
-          className="group inline-flex items-center gap-2 text-white/80 hover:text-white transition-all mb-12 font-black text-xs uppercase tracking-[0.2em]"
+          className="group relative inline-flex items-center gap-3 py-2 px-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-500 mb-6 shadow-lg"
         >
-          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-          返回列表
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.2em] relative z-10">&lt; 返回</span>
         </button>
 
         <FadeContent duration={600} blur={true}>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-8 md:p-10 rounded-[40px] space-y-8">
-            <div className="space-y-4">
-              <label className="text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">项目标题</label>
+          <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-7 md:p-10 rounded-[40px] space-y-6">
+            <div className="space-y-2.5">
+              <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">旅程标题</label>
               <input
                 {...register('title')}
-                placeholder="例如：2026 夏日冲绳之旅"
-                className="glass-input w-full"
+                placeholder="2026 夏日冲绳之旅"
+                className="glass-input w-full placeholder:text-white/10"
               />
               {errors.title && <p className="text-accent-coral text-[10px] font-bold ml-1">{errors.title.message}</p>}
             </div>
 
-            <div className="space-y-4">
-              <label className="text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">目的地</label>
+            <div className="space-y-2.5">
+              <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">目的地</label>
               <input
                 {...register('destination')}
-                placeholder="例如：冲绳，日本"
-                className="glass-input w-full"
+                placeholder="冲绳，日本"
+                className="glass-input w-full placeholder:text-white/10"
               />
               {errors.destination && <p className="text-accent-coral text-[10px] font-bold ml-1">{errors.destination.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Start Date */}
-              <div className="space-y-4">
-                <label className="text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">开始日期</label>
+              <div className="space-y-2.5">
+                <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">开始日期</label>
                 <div
                   onClick={() => setIsStartDateOpen(true)}
                   className="glass-input w-full flex items-center justify-start cursor-pointer hover:bg-black/30 transition-colors"
@@ -147,8 +146,8 @@ export default function CreateTripPage() {
               </div>
 
               {/* End Date */}
-              <div className="space-y-4">
-                <label className="text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">结束日期</label>
+              <div className="space-y-2.5">
+                <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">结束日期</label>
                 <div
                   onClick={() => setIsEndDateOpen(true)}
                   className="glass-input w-full flex items-center justify-start cursor-pointer hover:bg-black/30 transition-colors"
@@ -164,9 +163,9 @@ export default function CreateTripPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">结算货币</label>
-              <div 
+            <div className="space-y-2.5">
+              <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">结算货币</label>
+              <div
                 onClick={() => setIsCurrencyOpen(true)}
                 className="glass-input w-full flex items-center justify-between cursor-pointer hover:bg-black/30 transition-colors"
               >
@@ -201,12 +200,13 @@ export default function CreateTripPage() {
               type="submit"
               disabled={isSubmitting}
               whileTap={{ scale: 0.98 }}
-              className="btn-primary w-full h-16 mt-4 shadow-[0_20px_40px_rgba(255,255,255,0.1)]"
+              className="relative w-full h-16 mt-6 bg-white/10 hover:bg-white/15 backdrop-blur-xl border border-white/20 rounded-[24px] flex items-center justify-center transition-all duration-500 overflow-hidden shadow-2xl"
             >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
               {isSubmitting ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <span className="tracking-[0.2em] font-black">创建项目</span>
+                <span className="tracking-[0.2em] font-black">创建旅程</span>
               )}
             </motion.button>
           </form>

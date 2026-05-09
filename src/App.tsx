@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -12,8 +12,12 @@ import MainLayout from '@/components/layout/MainLayout'
 import LoginPage from '@/features/auth/pages/LoginPage'
 import TripListPage from '@/features/trips/pages/TripListPage'
 import CreateTripPage from '@/features/trips/pages/CreateTripPage'
+import MembersPage from '@/features/trips/pages/MembersPage'
 import ExpenseListPage from '@/features/expenses/pages/ExpenseListPage'
 import SettlementPage from '@/features/expenses/pages/SettlementPage'
+import FadeContent from '@/components/FadeContent'
+import { ArrowLeft, Receipt, LayoutDashboard } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 const queryClient = new QueryClient()
 
@@ -56,42 +60,82 @@ function TripDashboard() {
 
   return (
     <FadeContent blur={true} duration={800}>
-      <div className="py-12 md:py-20">
-        <header className="mb-20 space-y-4">
-          <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter">
+      <div className="space-y-12">
+        <header className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-[2px] bg-[#0A84FF] rounded-full" />
+            <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">Current Voyage</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             {currentTrip.title}
           </h1>
-          <div className="flex items-center gap-4 text-slate-400 font-bold tracking-widest text-xs uppercase opacity-60">
-            <span>{currentTrip.destination}</span>
-            <span>·</span>
-            <span>{currentTrip.currency}</span>
+          <div className="flex items-center gap-4 text-white/30 font-bold tracking-widest text-[10px] uppercase">
+            <span className="flex items-center gap-2">
+              <div className="w-1 h-1 rounded-full bg-white/20" />
+              {currentTrip.destination}
+            </span>
+            <span className="flex items-center gap-2">
+              <div className="w-1 h-1 rounded-full bg-white/20" />
+              {currentTrip.currency}
+            </span>
           </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="glass-card p-10 rounded-[40px] flex flex-col justify-between h-56 group hover:-translate-y-1 transition-all duration-500">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">总支出</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-black text-white tracking-tighter">0.00</span>
-              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">{currentTrip.currency}</span>
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="glass-card p-8 rounded-[32px] space-y-6 relative overflow-hidden group border border-white/5"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Receipt className="w-12 h-12 text-white" />
             </div>
-          </div>
+            <span className="block text-sm font-bold text-white/40 uppercase tracking-[0.15em]">总支出</span>
+            <div className="space-y-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-white tracking-tighter">0.00</span>
+                <span className="text-xs font-bold text-white/20 uppercase tracking-widest">{currentTrip.currency}</span>
+              </div>
+              <p className="text-[10px] text-white/20 font-medium">本旅程所有成员累计支出</p>
+            </div>
+          </motion.div>
 
-          <div className="glass-card p-10 rounded-[40px] flex flex-col justify-between h-56 group hover:-translate-y-1 transition-all duration-500">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">待结算</span>
-            <div className="flex items-baseline gap-2">
-              <span className="text-5xl font-black text-white tracking-tighter">0.00</span>
-              <span className="text-sm font-black text-slate-500 uppercase tracking-widest">{currentTrip.currency}</span>
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="glass-card p-8 rounded-[32px] space-y-6 relative overflow-hidden group border border-white/5"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <LayoutDashboard className="w-12 h-12 text-white" />
             </div>
-          </div>
+            <span className="block text-sm font-bold text-white/40 uppercase tracking-[0.15em]">待结算</span>
+            <div className="space-y-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-white tracking-tighter text-[#FFB800]">0.00</span>
+                <span className="text-xs font-bold text-white/20 uppercase tracking-widest">{currentTrip.currency}</span>
+              </div>
+              <p className="text-[10px] text-white/20 font-medium">当前仍有待确认的款项</p>
+            </div>
+          </motion.div>
 
-          <div className="glass-card p-10 rounded-[40px] flex flex-col justify-between h-56 group hover:-translate-y-1 transition-all duration-500">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">旅程状态</span>
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-              <span className="text-2xl font-black text-white tracking-tight">活跃中</span>
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="glass-card p-8 rounded-[32px] space-y-6 relative overflow-hidden group border border-white/5"
+          >
+            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
+              <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 flex items-center justify-center">
+                <div className="w-4 h-4 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
             </div>
-          </div>
+            <span className="block text-sm font-bold text-white/40 uppercase tracking-[0.15em]">旅程状态</span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Active</span>
+                </div>
+                <span className="text-xl font-bold text-white tracking-tight">进行中</span>
+              </div>
+              <p className="text-[10px] text-white/20 font-medium">当前旅程处于活跃状态</p>
+            </div>
+          </motion.div>
         </div>
       </div>
     </FadeContent>
@@ -104,16 +148,6 @@ const Itinerary = () => (
     <p className="text-text-secondary mt-1 italic">为您规划更高效的路线...</p>
     <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
       <p className="text-text-muted">行程管理功能即将上线。</p>
-    </div>
-  </div>
-)
-
-const Members = () => (
-  <div className="py-8">
-    <h1 className="text-3xl font-bold text-text-primary">成员管理</h1>
-    <p className="text-text-secondary mt-1 italic">管理您的旅程成员...</p>
-    <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
-      <p className="text-text-muted">成员邀请与角色管理即将上线。</p>
     </div>
   </div>
 )
@@ -148,8 +182,6 @@ const Settings = () => {
   )
 }
 
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
 
 function App() {
   return (
@@ -184,7 +216,7 @@ function App() {
                 <Route path="itinerary" element={<Itinerary />} />
                 <Route path="expenses" element={<ExpenseListPage />} />
                 <Route path="settlement" element={<SettlementPage />} />
-                <Route path="members" element={<Members />} />
+                <Route path="members" element={<MembersPage />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
             </Routes>

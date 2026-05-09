@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+
+@theme {
+  /* 航海与阳光主题色板 - 高级感浅色系 */
+  --color-bg-primary: #F0F9FF; /* 极浅的天空蓝 */
+  --color-bg-secondary: #E0F2FE; /* 浅水蓝 */
+  
+  --color-accent-primary: #0EA5E9; /* 碧海蓝 */
+  --color-accent-success: #10B981; /* 薄荷绿 (清新) */
+  --color-accent-warning: #F59E0B; /* 阳光金 */
+  --color-accent-danger: #F43F5E; /* 珊瑚红 */
+
+  --color-text-primary: #0F172A; /* 深石板色 (极高对比度) */
+  --color-text-secondary: #475569; /* 中石板色 */
+  --color-text-muted: #94A3B8; /* 浅石板色 */
+
+  --color-surface-glass: rgba(255, 255, 255, 0.5); /* 浅色玻璃 */
+  --color-surface-glass-strong: rgba(255, 255, 255, 0.8);
+
+  --font-sans: "Geist Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Inter", "system-ui", "sans-serif";
+  --font-mono: "JetBrains Mono", "monospace";
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-primary);
+    background-image: radial-gradient(circle at top right, #E0F2FE 0%, transparent 40%),
+                      radial-gradient(circle at bottom left, #FEF3C7 0%, transparent 30%); /* 模拟阳光与海水的渐变 */
+    color: var(--color-text-primary);
+    min-height: 100vh;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .glass {
+    background-color: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.05); /* 柔和阴影替代深色边框 */
+  }
+  
+  .glass-strong {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 10px 40px 0 rgba(15, 23, 42, 0.08);
+  }
+
+  /* 针对浅色主题的输入框优化 */
+  .glass-input {
+    @apply bg-white/40 border border-white/60 rounded-xl py-3 px-4 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:bg-white/60 transition-all;
+  }
+}

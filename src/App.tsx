@@ -1,129 +1,177 @@
-import { useMemo, useState } from 'react';
+import { useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { useTripStore } from '@/stores/useTripStore'
 
-type Tab = 'Dashboard' | 'Itinerary' | 'Expenses' | 'Settlement' | 'Stats';
+// Layouts
+import MainLayout from '@/components/layout/MainLayout'
 
-const tabs: Tab[] = ['Dashboard', 'Itinerary', 'Expenses', 'Settlement', 'Stats'];
+// Pages
+import LoginPage from '@/features/auth/pages/LoginPage'
+import TripListPage from '@/features/trips/pages/TripListPage'
+import CreateTripPage from '@/features/trips/pages/CreateTripPage'
+import ExpenseListPage from '@/features/expenses/pages/ExpenseListPage'
+import SettlementPage from '@/features/expenses/pages/SettlementPage'
 
-export function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('Dashboard');
+const queryClient = new QueryClient()
 
-  const content = useMemo(() => {
-    switch (activeTab) {
-      case 'Dashboard':
-        return <Dashboard />;
-      case 'Itinerary':
-        return <Itinerary />;
-      case 'Expenses':
-        return <Expenses />;
-      case 'Settlement':
-        return <Settlement />;
-      case 'Stats':
-        return <Stats />;
-    }
-  }, [activeTab]);
+function AuthInitializer({ children }: { children: React.ReactNode }) {
+  const { setUser } = useAuthStore()
 
-  return (
-    <div className="app-shell">
-      <header className="glass panel top-bar">
-        <div>
-          <p className="subtle">VoyageBoard · Team Trip</p>
-          <h1>海南环岛 · Day 3</h1>
-        </div>
-        <p className="mono">Sanya · 2026-05-08</p>
-      </header>
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+    })
 
-      <main className="content">{content}</main>
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
 
-      <nav className="bottom-nav glass panel">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            className={tab === activeTab ? 'nav-btn active' : 'nav-btn'}
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab}
-          </button>
-        ))}
-      </nav>
-    </div>
-  );
+    return () => subscription.unsubscribe()
+  }, [setUser])
+
+  return <>{children}</>
 }
 
-function Dashboard() {
-  return (
-    <section className="grid">
-      <article className="glass panel">
-        <h2>今日行程</h2>
-        <p>蜈支洲岛 · 后海 · 免税城</p>
-      </article>
-      <article className="glass panel stat-row">
-        <Metric label="今日消费" value="¥1,826" tone="primary" />
-        <Metric label="当前人均" value="¥608" tone="mint" />
-        <Metric label="待结算" value="¥412" tone="warning" />
-      </article>
-      <button className="cta">+ 添加支出</button>
-    </section>
-  );
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuthStore()
+
+  if (loading) return null
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
 }
 
-function Itinerary() {
-  return (
-    <section className="grid">
-      <article className="glass panel">
-        <h2>DAY 3 · 万宁</h2>
-        <ul>
-          <li>08:30 酒店出发</li>
-          <li>10:00 石梅湾冲浪</li>
-          <li>13:00 海鲜午餐</li>
-          <li>16:00 神州半岛日落</li>
-        </ul>
-      </article>
-    </section>
-  );
-}
+function TripDashboard() {
+  const { currentTrip } = useTripStore()
 
-function Expenses() {
-  return (
-    <section className="grid">
-      <article className="glass panel expense-card">
-        <p className="amount mono">¥328</p>
-        <p>海鲜晚餐</p>
-        <p className="subtle">张三支付 · 参与: 全员</p>
-      </article>
-    </section>
-  );
-}
+  if (!currentTrip) {
+    return <Navigate to="/trips" replace />
+  }
 
-function Settlement() {
-  return (
-    <section className="grid">
-      <article className="glass panel">
-        <h2>结算流</h2>
-        <p className="flow">李四 → 张三 <span className="mono">¥182</span></p>
-        <p className="flow">王五 → 张三 <span className="mono">¥341</span></p>
-        <p className="flow done">赵六 → 李四 <span className="mono">¥72</span></p>
-      </article>
-    </section>
-  );
-}
-
-function Stats() {
-  return (
-    <section className="grid">
-      <article className="glass panel stat-row">
-        <Metric label="总花费" value="¥8,912" tone="primary" />
-        <Metric label="人均消费" value="¥2,228" tone="mint" />
-        <Metric label="油费成本/km" value="¥0.94" tone="warning" />
-      </article>
-    </section>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone: 'primary' | 'mint' | 'warning' }) {
   return (
     <div>
-      <p className="subtle">{label}</p>
-      <p className={`metric mono ${tone}`}>{value}</p>
+      <h1 className="text-3xl font-bold text-text-primary">{currentTrip.title}</h1>
+      <p className="text-text-secondary mt-1">{currentTrip.destination}</p>
+      
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="glass p-6 rounded-3xl h-40 flex flex-col justify-center">
+          <span className="text-text-muted text-xs uppercase font-bold tracking-wider">当前目的地</span>
+          <span className="text-2xl font-bold text-text-primary mt-1">{currentTrip.destination}</span>
+        </div>
+        <div className="glass p-6 rounded-3xl h-40 flex flex-col justify-center">
+          <span className="text-text-muted text-xs uppercase font-bold tracking-wider">结算货币</span>
+          <span className="text-3xl font-mono font-bold text-accent-primary mt-1">{currentTrip.currency}</span>
+        </div>
+        <div className="glass p-6 rounded-3xl h-40 flex flex-col justify-center">
+          <span className="text-text-muted text-xs uppercase font-bold tracking-wider">旅程状态</span>
+          <span className="text-xl font-bold text-accent-success mt-1">进行中</span>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
+
+const Itinerary = () => (
+  <div className="py-8">
+    <h1 className="text-3xl font-bold text-text-primary">行程规划</h1>
+    <p className="text-text-secondary mt-1 italic">正在规划您的精彩冒险...</p>
+    <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
+      <p className="text-text-muted">行程管理功能即将上线。</p>
+    </div>
+  </div>
+)
+
+const Members = () => (
+  <div className="py-8">
+    <h1 className="text-3xl font-bold text-text-primary">成员管理</h1>
+    <p className="text-text-secondary mt-1 italic">管理您的旅行伙伴...</p>
+    <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
+      <p className="text-text-muted">成员邀请与角色管理即将上线。</p>
+    </div>
+  </div>
+)
+
+const Settings = () => {
+  const { signOut } = useAuthStore()
+  const { setCurrentTrip } = useTripStore()
+  const navigate = useNavigate()
+
+  return (
+    <div className="py-8">
+      <h1 className="text-3xl font-bold text-text-primary">系统设置</h1>
+      <div className="mt-8 space-y-4">
+        <button
+          onClick={() => {
+            setCurrentTrip(null)
+            navigate('/trips')
+          }}
+          className="w-full text-left glass p-5 rounded-2xl text-text-primary font-semibold hover:bg-white/60 transition-all flex items-center justify-between"
+        >
+          <span>切换旅行项目</span>
+          <ArrowLeft className="h-5 w-5 rotate-180 text-accent-primary" />
+        </button>
+        <button
+          onClick={() => signOut()}
+          className="w-full text-left glass p-5 rounded-2xl text-accent-danger font-semibold hover:bg-accent-danger/5 transition-all"
+        >
+          注销登录
+        </button>
+      </div>
+    </div>
+  )
+}
+
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft } from 'lucide-react'
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthInitializer>
+        <Router>
+          <div className="min-h-screen text-text-primary">
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              
+              <Route path="/trips" element={
+                <ProtectedRoute>
+                  <div className="max-w-5xl mx-auto px-4">
+                    <TripListPage />
+                  </div>
+                </ProtectedRoute>
+              } />
+              <Route path="/trips/new" element={
+                <ProtectedRoute>
+                  <div className="max-w-5xl mx-auto px-4">
+                    <CreateTripPage />
+                  </div>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
+              }>
+                <Route index element={<TripDashboard />} />
+                <Route path="itinerary" element={<Itinerary />} />
+                <Route path="expenses" element={<ExpenseListPage />} />
+                <Route path="settlement" element={<SettlementPage />} />
+                <Route path="members" element={<Members />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+            </Routes>
+          </div>
+        </Router>
+      </AuthInitializer>
+    </QueryClientProvider>
+  )
+}
+
+export default App

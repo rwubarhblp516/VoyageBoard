@@ -10,14 +10,15 @@ interface AppleDatePickerProps {
 }
 
 export default function AppleDatePicker({ isOpen, onClose, value, onChange }: AppleDatePickerProps) {
-  const initialDate = useMemo(() => value ? new Date(value) : new Date(), [value])
+  const currentYear = useMemo(() => new Date().getFullYear(), [])
   
-  const years = useMemo(() => Array.from({ length: 40 }, (_, i) => 2000 + i), [])
+  // Create a dynamic range centered around current year
+  const years = useMemo(() => Array.from({ length: 101 }, (_, i) => (currentYear - 50) + i), [currentYear])
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), [])
   
-  const [selectedYear, setSelectedYear] = useState(initialDate.getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState(initialDate.getMonth() + 1)
-  const [selectedDay, setSelectedDay] = useState(initialDate.getDate())
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate())
 
   const days = useMemo(() => {
     const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate()
@@ -38,19 +39,41 @@ export default function AppleDatePicker({ isOpen, onClose, value, onChange }: Ap
     }
   }
 
+  const isInitialOpen = useRef(true)
+
   useEffect(() => {
     if (isOpen) {
-      const date = value ? new Date(value) : new Date()
-      setSelectedYear(date.getFullYear())
-      setSelectedMonth(date.getMonth() + 1)
-      setSelectedDay(date.getDate())
+      if (isInitialOpen.current) {
+        // Only sync from 'value' prop on the very first open moment
+        const date = value ? new Date(value) : new Date()
+        const y = date.getFullYear()
+        const m = date.getMonth() + 1
+        const d = date.getDate()
 
-      const timer = setTimeout(() => {
-        syncScroll(yearRef, years, date.getFullYear())
-        syncScroll(monthRef, months, date.getMonth() + 1)
-        syncScroll(dayRef, days, date.getDate())
-      }, 100)
-      return () => clearTimeout(timer)
+        setSelectedYear(y)
+        setSelectedMonth(m)
+        setSelectedDay(d)
+
+        const performSync = () => {
+          syncScroll(yearRef, years, y)
+          syncScroll(monthRef, months, m)
+          syncScroll(dayRef, days, d)
+        }
+
+        performSync()
+        const timer = setTimeout(performSync, 50)
+        const timer2 = setTimeout(performSync, 150)
+        
+        isInitialOpen.current = false
+        
+        return () => {
+          clearTimeout(timer)
+          clearTimeout(timer2)
+        }
+      }
+    } else {
+      // Reset the flag when picker closes
+      isInitialOpen.current = true
     }
   }, [isOpen, value, years, months, days])
 

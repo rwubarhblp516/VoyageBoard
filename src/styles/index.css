@@ -89,6 +89,12 @@
   .ios-picker-highlight {
     @apply absolute top-1/2 left-0 right-0 h-12 -translate-y-1/2 bg-white/5 border-y border-white/10 pointer-events-none z-0 rounded-xl;
   }
+}
 
-  .no-scrollbar::-webkit-scrollbar { display: none; }
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -99,7 +99,7 @@ export default function CreateTripPage() {
       <div className="relative z-10 max-w-xl mx-auto px-6 py-10 md:py-16 pb-20">
         <button
           onClick={() => navigate('/trips')}
-          className="group relative inline-flex items-center gap-3 py-2 px-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all duration-500 mb-6 shadow-lg"
+          className="group relative inline-flex items-center gap-3 py-2 px-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/10 hover:border-white/20 transition-all duration-500 mb-6 shadow-lg"
         >
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
           <span className="text-[9px] font-bold uppercase tracking-[0.2em] relative z-10">&lt; 返回</span>
@@ -108,7 +108,7 @@ export default function CreateTripPage() {
         <FadeContent duration={600} blur={true}>
           <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-7 md:p-10 rounded-[40px] space-y-6">
             <div className="space-y-2.5">
-              <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">旅程标题</label>
+              <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">旅程标题</label>
               <input
                 {...register('title')}
                 placeholder="2026 夏日冲绳之旅"
@@ -118,7 +118,7 @@ export default function CreateTripPage() {
             </div>
 
             <div className="space-y-2.5">
-              <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">目的地</label>
+              <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">目的地</label>
               <input
                 {...register('destination')}
                 placeholder="冲绳，日本"
@@ -130,7 +130,7 @@ export default function CreateTripPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Start Date */}
               <div className="space-y-2.5">
-                <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">开始日期</label>
+                <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">开始日期</label>
                 <div
                   onClick={() => setIsStartDateOpen(true)}
                   className="glass-input w-full flex items-center justify-start cursor-pointer hover:bg-black/30 transition-colors"
@@ -147,7 +147,7 @@ export default function CreateTripPage() {
 
               {/* End Date */}
               <div className="space-y-2.5">
-                <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">结束日期</label>
+                <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">结束日期</label>
                 <div
                   onClick={() => setIsEndDateOpen(true)}
                   className="glass-input w-full flex items-center justify-start cursor-pointer hover:bg-black/30 transition-colors"
@@ -164,7 +164,7 @@ export default function CreateTripPage() {
             </div>
 
             <div className="space-y-2.5">
-              <label className="text-xs font-black text-white/60 uppercase tracking-[0.2em] ml-1">结算货币</label>
+              <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">结算货币</label>
               <div
                 onClick={() => setIsCurrencyOpen(true)}
                 className="glass-input w-full flex items-center justify-between cursor-pointer hover:bg-black/30 transition-colors"

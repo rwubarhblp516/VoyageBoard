@@ -96,19 +96,19 @@ export default function LoginPage() {
               direction="top"
               className="text-7xl font-black text-white tracking-tighter drop-shadow-[0_10px_50px_rgba(0,0,0,1)]"
             />
-            <p className="mt-4 text-white/90 tracking-[0.3em] font-black text-xs uppercase drop-shadow-[0_5px_15px_rgba(0,0,0,1)]">
+            <p className="mt-4 text-white tracking-[0.3em] font-black text-xs uppercase drop-shadow-[0_5px_15px_rgba(0,0,0,1)]">
               VoyageBoard · Collaborative Budgeting
             </p>
           </div>
 
           <div className="glass-card p-10 rounded-[40px] border-white/10 shadow-2xl relative overflow-hidden">
-            <h2 className="text-3xl font-black mb-10 text-white/90 text-center tracking-tight">
+            <h2 className="text-3xl font-black mb-10 text-white text-center tracking-tight">
               {isSignUp ? '立即注册' : '欢迎回来'}
             </h2>
 
             <form onSubmit={handleAuth} className="space-y-6">
               <div className="space-y-3">
-                <label htmlFor="email" className="block text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">
+                <label htmlFor="email" className="block text-xs font-black text-white ml-1 uppercase tracking-[0.2em]">
                   电子邮箱
                 </label>
                 <div className="relative group">
@@ -126,7 +126,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-3">
-                <label htmlFor="password" className="block text-xs font-black text-white/90 ml-1 uppercase tracking-[0.2em]">
+                <label htmlFor="password" className="block text-xs font-black text-white ml-1 uppercase tracking-[0.2em]">
                   登录密码
                 </label>
                 <div className="relative group">
@@ -169,7 +169,7 @@ export default function LoginPage() {
                   setIsSignUp(!isSignUp)
                   setMessage(null)
                 }}
-                className="text-white/60 text-[10px] font-black tracking-[0.2em] uppercase hover:text-white transition-all w-full"
+                className="text-white text-[10px] font-black tracking-[0.2em] uppercase hover:text-white transition-all w-full"
               >
                 {isSignUp ? '已有账号？点击登录' : '没有账号？立即创建'}
               </button>

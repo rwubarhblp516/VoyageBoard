@@ -64,18 +64,18 @@ function TripDashboard() {
         <header className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-[2px] bg-[#0A84FF] rounded-full" />
-            <span className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">Current Voyage</span>
+            <span className="text-[10px] font-bold text-text-sub uppercase tracking-[0.3em]">Current Voyage</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             {currentTrip.title}
           </h1>
-          <div className="flex items-center gap-4 text-white/30 font-bold tracking-widest text-[10px] uppercase">
+          <div className="flex items-center gap-4 text-text-sub font-bold tracking-widest text-[10px] uppercase">
             <span className="flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-white/20" />
+              <div className="w-1 h-1 rounded-full bg-white/40" />
               {currentTrip.destination}
             </span>
             <span className="flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-white/20" />
+              <div className="w-1 h-1 rounded-full bg-white/40" />
               {currentTrip.currency}
             </span>
           </div>
@@ -89,13 +89,13 @@ function TripDashboard() {
             <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <Receipt className="w-12 h-12 text-white" />
             </div>
-            <span className="block text-sm font-bold text-white/40 uppercase tracking-[0.15em]">总支出</span>
+            <span className="block text-sm font-bold text-text-sub uppercase tracking-[0.15em]">总支出</span>
             <div className="space-y-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-black text-white tracking-tighter">0.00</span>
-                <span className="text-xs font-bold text-white/20 uppercase tracking-widest">{currentTrip.currency}</span>
+                <span className="text-xs font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
               </div>
-              <p className="text-[10px] text-white/20 font-medium">本旅程所有成员累计支出</p>
+              <p className="text-[10px] text-text-sub font-medium">本旅程所有成员累计支出</p>
             </div>
           </motion.div>
 
@@ -106,13 +106,13 @@ function TripDashboard() {
             <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
               <LayoutDashboard className="w-12 h-12 text-white" />
             </div>
-            <span className="block text-sm font-bold text-white/40 uppercase tracking-[0.15em]">待结算</span>
+            <span className="block text-sm font-bold text-text-sub uppercase tracking-[0.15em]">待结算</span>
             <div className="space-y-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-black text-white tracking-tighter text-[#FFB800]">0.00</span>
-                <span className="text-xs font-bold text-white/20 uppercase tracking-widest">{currentTrip.currency}</span>
+                <span className="text-xs font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
               </div>
-              <p className="text-[10px] text-white/20 font-medium">当前仍有待确认的款项</p>
+              <p className="text-[10px] text-text-sub font-medium">当前仍有待确认的款项</p>
             </div>
           </motion.div>
 
@@ -125,7 +125,7 @@ function TripDashboard() {
                 <div className="w-4 h-4 rounded-full bg-emerald-500 animate-pulse" />
               </div>
             </div>
-            <span className="block text-sm font-bold text-white/40 uppercase tracking-[0.15em]">旅程状态</span>
+            <span className="block text-sm font-bold text-text-sub uppercase tracking-[0.15em]">旅程状态</span>
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
@@ -133,7 +133,7 @@ function TripDashboard() {
                 </div>
                 <span className="text-xl font-bold text-white tracking-tight">进行中</span>
               </div>
-              <p className="text-[10px] text-white/20 font-medium">当前旅程处于活跃状态</p>
+              <p className="text-[10px] text-text-sub font-medium">当前旅程处于活跃状态</p>
             </div>
           </motion.div>
         </div>

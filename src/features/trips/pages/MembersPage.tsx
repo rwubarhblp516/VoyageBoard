@@ -3,9 +3,11 @@ import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { Loader2, User, Shield, Edit2, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TripMember } from '@/types/trip'
+
+import { Navigate } from 'react-router-dom'
 
 export default function MembersPage() {
   const { currentTrip } = useTripStore()
@@ -13,6 +15,10 @@ export default function MembersPage() {
   const queryClient = useQueryClient()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+
+  if (!currentTrip) {
+    return <Navigate to="/trips" replace />
+  }
 
   const { data: members, isLoading: membersLoading } = useQuery<TripMember[]>({
     queryKey: ['members', currentTrip?.id],
@@ -22,12 +28,13 @@ export default function MembersPage() {
         .from('trip_members')
         .select('*')
         .eq('trip_id', currentTrip.id)
-        .order('created_at', { ascending: true })
+        .order('joined_at', { ascending: true })
       if (error) throw error
       return data as TripMember[]
     },
     enabled: !!currentTrip,
   })
+
 
   const isLoading = membersLoading || authLoading
 
@@ -60,11 +67,11 @@ export default function MembersPage() {
       <header className="flex items-end justify-between mb-12 gap-4">
         <div>
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">成员管理</h1>
-          <p className="text-white/40 font-medium">谁在和你一起探索世界？</p>
+          <p className="text-text-sub font-medium">谁在和你一起探索世界？</p>
         </div>
         <button
           onClick={handleCopyInvite}
-          className="group relative px-6 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white/60 hover:text-white transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-xl"
+          className="group relative px-6 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-xl"
         >
           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] relative z-10">邀请伙伴</span>
@@ -128,7 +135,7 @@ export default function MembersPage() {
                       )}
                     </div>
                     {!isEditing && (
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-white/20 uppercase tracking-widest">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-text-sub uppercase tracking-widest">
                         <span>{member.role === 'owner' ? 'Voyage Host' : 'Adventurer'}</span>
                       </div>
                     )}
@@ -140,7 +147,7 @@ export default function MembersPage() {
                         setEditingId(member.id)
                         setNewName(member.display_name)
                       }}
-                      className="p-3 rounded-2xl bg-white/5 text-white/40 hover:bg-white/10 hover:text-white border border-white/5 transition-all shadow-sm"
+                      className="p-3 rounded-2xl bg-white/5 text-white hover:bg-white/10 border border-white/5 transition-all shadow-sm"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
@@ -153,8 +160,8 @@ export default function MembersPage() {
       )}
 
       <div className="mt-12 glass-panel p-10 rounded-[44px] border-dashed border-2 border-white/5 text-center group transition-all hover:border-white/10">
-        <p className="text-white/20 font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white/40 transition-colors">Your Invitation Code</p>
-        <div className="inline-flex items-center gap-4 px-6 py-3 bg-black/20 rounded-2xl border border-white/10 font-mono text-xs text-white/40 group-hover:text-white/80 group-hover:border-white/20 transition-all">
+        <p className="text-text-sub font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white transition-colors">Your Invitation Code</p>
+        <div className="inline-flex items-center gap-4 px-6 py-3 bg-black/40 rounded-2xl border border-white/10 font-mono text-xs text-white group-hover:border-white/20 transition-all">
           {currentTrip?.id}
         </div>
       </div>

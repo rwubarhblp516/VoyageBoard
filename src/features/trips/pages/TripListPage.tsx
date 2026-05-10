@@ -57,7 +57,7 @@ export default function TripListPage() {
         <FadeContent blur={true} duration={800}>
           {/* 极致简约 Header */}
           <header className="mb-24">
-            <h1 className="text-5xl font-black text-white/90 tracking-tighter">
+            <h1 className="text-5xl font-black text-white tracking-tighter">
               我的旅程
             </h1>
           </header>
@@ -83,20 +83,20 @@ export default function TripListPage() {
                     hoveredId === trip.id ? 'border-white/10 bg-white/5 -translate-y-2 shadow-[0_30px_60px_rgba(0,0,0,0.6)]' : ''
                   }`}>
                     <div className="flex justify-between items-start mb-10">
-                      <span className="text-[10px] font-black text-white/20 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                      <span className="text-[10px] font-black text-text-sub uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
                         {trip.currency}
                       </span>
                     </div>
                     
-                    <h3 className="text-2xl font-black text-white/90 mb-2 tracking-tight group-hover:text-white transition-colors">
+                    <h3 className="text-2xl font-black text-white mb-2 tracking-tight group-hover:text-white transition-colors">
                       {trip.title}
                     </h3>
-                    <p className="text-white/30 font-medium text-sm">
+                    <p className="text-text-sub font-medium text-sm">
                       {trip.destination}
                     </p>
                     
                     <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Open</span>
+                      <span className="text-[10px] font-black text-text-sub uppercase tracking-[0.2em]">Open</span>
                       <ChevronRight className="h-4 w-4 text-white/20" />
                     </div>
                   </div>

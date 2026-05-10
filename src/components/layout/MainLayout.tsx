@@ -69,7 +69,7 @@ export default function MainLayout() {
                 className={`relative flex flex-col items-center justify-center gap-1.5 w-24 py-3 rounded-2xl transition-all duration-500 group ${
                   isActive 
                     ? 'text-white' 
-                    : 'text-white/30 hover:text-white/60'
+                    : 'text-text-sub hover:text-white'
                 }`}
               >
                 {isActive && (
@@ -79,7 +79,7 @@ export default function MainLayout() {
                   />
                 )}
                 <Icon className={`h-5 w-5 relative z-10 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                <span className={`text-[10px] font-bold tracking-[0.2em] relative z-10 transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                <span className={`text-[10px] font-bold tracking-[0.2em] relative z-10 transition-all duration-500 ${isActive ? 'text-white' : 'text-text-sub'}`}>
                   {item.label}
                 </span>
                 {isActive && (

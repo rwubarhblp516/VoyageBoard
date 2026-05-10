@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { Trip } from '@/types/trip'
 
 interface TripState {
@@ -10,11 +11,18 @@ interface TripState {
   setLoading: (loading: boolean) => void
 }
 
-export const useTripStore = create<TripState>((set) => ({
-  trips: [],
-  currentTrip: null,
-  loading: false,
-  setTrips: (trips) => set({ trips }),
-  setCurrentTrip: (trip) => set({ currentTrip: trip }),
-  setLoading: (loading) => set({ loading }),
-}))
+export const useTripStore = create<TripState>()(
+  persist(
+    (set) => ({
+      trips: [],
+      currentTrip: null,
+      loading: false,
+      setTrips: (trips) => set({ trips }),
+      setCurrentTrip: (trip) => set({ currentTrip: trip }),
+      setLoading: (loading) => set({ loading }),
+    }),
+    {
+      name: 'voyage-trip-storage',
+    }
+  )
+)

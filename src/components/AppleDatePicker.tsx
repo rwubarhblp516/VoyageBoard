@@ -113,7 +113,7 @@ export default function AppleDatePicker({ isOpen, onClose, value, onChange }: Ap
           <div 
             key={item} 
             className={`h-[44px] flex items-center justify-center snap-center text-[19px] transition-all duration-200 tracking-tight ${
-              currentValue === item ? 'text-white font-medium' : 'text-white/20 font-light'
+              currentValue === item ? 'text-white font-medium' : 'text-text-sub font-light'
             }`}
           >
             {format(item)}
@@ -149,8 +149,8 @@ export default function AppleDatePicker({ isOpen, onClose, value, onChange }: Ap
 
             <div className="px-6 py-4 flex justify-between items-center border-b border-white/5">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">Voyage Picker</span>
-                <span className="text-lg font-medium text-white/90">选择日期</span>
+                <span className="text-[9px] font-bold text-text-sub uppercase tracking-[0.25em]">Voyage Picker</span>
+                <span className="text-lg font-medium text-white">选择日期</span>
               </div>
               <button 
                 onClick={handleDone}

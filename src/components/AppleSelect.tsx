@@ -41,8 +41,8 @@ export default function AppleSelect({ isOpen, onClose, options, value, onChange,
 
             <div className="px-6 py-4 flex justify-between items-center border-b border-white/5">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">Voyage Picker</span>
-                <span className="text-lg font-medium text-white/90">{title}</span>
+                <span className="text-[9px] font-bold text-text-sub uppercase tracking-[0.25em]">Voyage Picker</span>
+                <span className="text-lg font-medium text-white">{title}</span>
               </div>
               <button 
                 onClick={onClose}
@@ -64,7 +64,7 @@ export default function AppleSelect({ isOpen, onClose, options, value, onChange,
                     className={`w-full flex items-center justify-between px-6 py-4 rounded-2xl transition-all ${
                       value === option.value 
                         ? 'bg-white/10 text-white' 
-                        : 'text-white/40 hover:bg-white/5 hover:text-white/60'
+                        : 'text-text-sub hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     <span className="text-base font-medium">{option.label}</span>

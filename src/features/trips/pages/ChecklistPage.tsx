@@ -117,11 +117,11 @@ export default function ChecklistPage() {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <header className="mb-10">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-8 h-[2px] bg-white/30 rounded-full" />
-          <span className="text-[10px] font-bold text-text-sub uppercase tracking-[0.3em]">CHECKLIST</span>
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+          <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">CHECKLIST</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">行前清单</h1>
-        <p className="text-text-sub font-medium mt-2">打点好一切，开启无忧旅程。</p>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">行前清单</h1>
+        <p className="text-white/80 font-medium mt-2 drop-shadow-sm">打点好一切，开启无忧旅程。</p>
       </header>
 
       {/* 添加表单 */}
@@ -134,7 +134,7 @@ export default function ChecklistPage() {
           value={newItemTitle}
           onChange={(e) => setNewItemTitle(e.target.value)}
           placeholder="添加一个新的待办/准备事项..."
-          className="w-full bg-white/5 border border-white/10 hover:border-white/20 focus:border-white/30 rounded-3xl pl-14 pr-16 py-5 text-white focus:outline-none transition-all font-medium placeholder:text-white/30 shadow-inner"
+          className="w-full bg-black/20 backdrop-blur-md border border-white/20 hover:border-white/30 focus:border-white/50 rounded-3xl pl-14 pr-16 py-5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60 shadow-lg"
         />
         <button
           type="submit"
@@ -160,8 +160,8 @@ export default function ChecklistPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, x: -20 }}
                 key={item.id}
-                className={`glass-card p-4 sm:p-5 rounded-[24px] border transition-all duration-300 flex items-center gap-4 group ${
-                  item.is_completed ? 'bg-white/5 border-transparent opacity-60' : 'bg-[#1C1C1E]/40 border-white/10 hover:border-white/20'
+                className={`glass-card p-4 sm:p-5 rounded-[24px] border transition-all duration-300 flex items-center gap-4 group shadow-md ${
+                  item.is_completed ? 'bg-black/10 backdrop-blur-sm border-white/5 opacity-70' : 'bg-black/30 backdrop-blur-md border-white/20 hover:border-white/30'
                 }`}
               >
                 {/* Checkbox */}
@@ -200,7 +200,7 @@ export default function ChecklistPage() {
 
                   {/* 确认人标签 */}
                   {item.is_completed && item.completed_by && (
-                    <span className="shrink-0 text-[10px] font-bold bg-emerald-400/15 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-400/20 shadow-sm">
+                    <span className="shrink-0 text-[10px] font-black bg-emerald-500/80 text-white px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-400/30 shadow-md drop-shadow-sm">
                       {item.completed_by.display_name}
                     </span>
                   )}
@@ -228,12 +228,12 @@ export default function ChecklistPage() {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="text-center py-32 glass-panel rounded-[40px] border-dashed border-2 border-white/5">
-          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
-            <ListTodo className="w-8 h-8 text-white/30" />
+        <div className="text-center py-32 bg-black/15 backdrop-blur-xl rounded-[40px] border-dashed border-2 border-white/20 shadow-lg">
+          <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-white/5">
+            <ListTodo className="w-8 h-8 text-white/60 drop-shadow-sm" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">一切准备就绪？</h3>
-          <p className="text-text-sub text-sm">开始添加你们的行前待办清单吧。</p>
+          <h3 className="text-xl font-bold text-white drop-shadow-md mb-2">一切准备就绪？</h3>
+          <p className="text-white/80 font-medium text-sm drop-shadow-sm">开始添加你们的行前待办清单吧。</p>
         </div>
       )}
     </div>

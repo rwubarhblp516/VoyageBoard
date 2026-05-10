@@ -162,12 +162,12 @@ function TripDashboard() {
         <header className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-[2px] bg-[#0A84FF] rounded-full" />
-            <span className="text-[10px] font-bold text-text-sub uppercase tracking-[0.3em]">Current Voyage</span>
+            <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em]">Current Voyage</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
             {currentTrip.title}
           </h1>
-          <div className="flex items-center gap-4 text-text-sub font-bold tracking-widest text-[10px] uppercase">
+          <div className="flex items-center gap-4 text-white/80 font-bold tracking-widest text-[10px] uppercase">
             <span className="flex items-center gap-2">
               <div className="w-1 h-1 rounded-full bg-white/40" />
               {currentTrip.destination}
@@ -186,24 +186,24 @@ function TripDashboard() {
           {/* 大数据头部：总计与人均 */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-10">
             <div className="space-y-3">
-              <span className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center gap-2">
+              <span className="text-xs font-bold text-white/80 uppercase tracking-[0.2em] flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />
                 总支出
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-6xl sm:text-7xl font-black text-white tracking-tighter tabular-nums leading-none">{totalExpenseDisplay}</span>
-                <span className="text-sm font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
+                <span className="text-sm font-bold text-white/80 uppercase tracking-widest">{currentTrip.currency}</span>
               </div>
             </div>
 
             <div className="md:text-right space-y-3 p-5 md:p-0 bg-white/5 md:bg-transparent rounded-2xl md:rounded-none border border-white/5 md:border-none">
-              <span className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center md:justify-end gap-2">
+              <span className="text-xs font-bold text-white/80 uppercase tracking-[0.2em] flex items-center md:justify-end gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#FFB800]" />
                 人均花费
               </span>
               <div className="flex items-baseline gap-2 md:justify-end">
                 <span className="text-4xl sm:text-5xl font-black text-[#FFB800] tracking-tighter tabular-nums leading-none">{perCapitaExpenseDisplay}</span>
-                <span className="text-xs font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
+                <span className="text-xs font-bold text-white/80 uppercase tracking-widest">{currentTrip.currency}</span>
               </div>
             </div>
           </div>
@@ -227,7 +227,7 @@ function TripDashboard() {
                           {(c.total / 100).toFixed(2)}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] font-bold text-text-sub uppercase tracking-wider">
+                      <div className="flex justify-between items-center text-[10px] font-bold text-white/70 uppercase tracking-wider">
                         <span>总花费</span>
                         <span className="text-[#FFB800]/90">人均 {(c.perCapita / 100).toFixed(2)}</span>
                       </div>
@@ -244,7 +244,7 @@ function TripDashboard() {
           <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="flex items-center gap-3 mb-6">
               <h2 className="text-xl font-bold text-white tracking-tight">成员总花费排行</h2>
-              <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest bg-white/5 px-2 py-1 rounded-md">
+              <span className="text-[10px] font-bold text-white/90 uppercase tracking-widest bg-black/15 px-2.5 py-1 rounded-md shadow-sm">
                 包含个人消费
               </span>
             </div>

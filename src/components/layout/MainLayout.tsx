@@ -1,8 +1,8 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { 
-  LayoutDashboard, 
-  Receipt, 
-  Settings as SettingsIcon, 
+import {
+  LayoutDashboard,
+  Receipt,
+  Settings as SettingsIcon,
   Users,
   ListTodo,
   Calculator
@@ -26,9 +26,11 @@ export default function MainLayout() {
     <div className="relative min-h-screen bg-bg-base text-slate-200 font-sans selection:bg-white/10 selection:text-white">
       {/* 还原高保真背景：通透、明亮、动感 */}
       <div className="fixed inset-0 z-0">
-        <LightPillar 
-          intensity={1.2} 
-          rotationSpeed={0.5} 
+        <LightPillar
+          topColor="#a3e5ef" // Midnight/Slate black
+          bottomColor="#f3c7f3" // Deep Ocean Cyan
+          intensity={0.9}
+          rotationSpeed={0.5}
           pillarRotation={25}
           pillarHeight={0.4}
           pillarWidth={2.2}
@@ -57,7 +59,7 @@ export default function MainLayout() {
 
       {/* 极简高级底部导航 (Dock Style) */}
       <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-[420px] px-6">
-        <motion.div 
+        <motion.div
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className="bg-black/40 backdrop-blur-[40px] saturate-[200%] border border-white/10 px-2 py-2 rounded-[36px] flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
@@ -65,27 +67,26 @@ export default function MainLayout() {
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.id || (item.id !== '/' && location.pathname.startsWith(item.id))
-            
+
             return (
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`relative flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-[28px] transition-all duration-500 group z-10 ${
-                  isActive 
-                    ? 'text-white' 
-                    : 'text-text-sub hover:text-white'
-                }`}
+                className={`relative flex flex-col items-center justify-center gap-1.5 flex-1 py-3 h-16 rounded-[24px] transition-all duration-500 group z-10 ${isActive
+                  ? 'text-white'
+                  : 'text-white/40 hover:text-white/80'
+                  }`}
               >
                 {isActive && (
-                  <motion.div 
+                  <motion.div
                     layoutId="nav-bg"
-                    className="absolute inset-0 bg-white/15 border border-white/10 rounded-[28px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]" 
-                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                    className="absolute inset-0 bg-white/10 border border-white/5 rounded-[24px] shadow-sm"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                     style={{ zIndex: -1 }}
                   />
                 )}
-                <Icon className={`h-6 w-6 transition-transform duration-500 ${isActive ? 'scale-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]' : 'group-hover:scale-110'}`} strokeWidth={isActive ? 2.5 : 2} />
-                <span className={`text-[9px] font-black tracking-widest uppercase transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+                <Icon className={`h-5 w-5 transition-transform duration-500 ${isActive ? 'scale-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]' : 'group-hover:scale-110'}`} strokeWidth={isActive ? 2.5 : 2} />
+                <span className={`text-[10px] font-bold tracking-widest uppercase transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto mt-0'}`}>
                   {item.label}
                 </span>
               </button>

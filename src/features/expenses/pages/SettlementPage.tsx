@@ -59,8 +59,8 @@ export default function SettlementPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <header className="mb-10">
-        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">结算</h1>
-        <p className="text-text-sub font-medium mt-2">清晰的收支明细，群内发红包即可。</p>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">结算</h1>
+        <p className="text-white/90 font-medium mt-2 drop-shadow-sm">清晰的收支明细，群内发红包即可。</p>
       </header>
 
       {isLoading ? (
@@ -76,12 +76,12 @@ export default function SettlementPage() {
 
             if (isAllSettled) {
               return (
-                <div className="text-center py-20 bg-white/5 rounded-[40px] border border-white/5">
-                  <div className="w-16 h-16 bg-emerald-400/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                <div className="text-center py-20 bg-black/15 backdrop-blur-xl rounded-[40px] border border-white/10 shadow-lg">
+                  <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-emerald-500/30">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-300 drop-shadow-md" />
                   </div>
-                  <h3 className="text-xl font-bold text-emerald-400 mb-2">没有任何欠款！</h3>
-                  <p className="text-text-sub text-sm">目前账目完全平衡，不需要发红包转账。</p>
+                  <h3 className="text-xl font-bold text-white drop-shadow-md mb-2">没有任何欠款！</h3>
+                  <p className="text-white/80 font-medium text-sm drop-shadow-sm">目前账目完全平衡，不需要发红包转账。</p>
                 </div>
               )
             }
@@ -140,8 +140,8 @@ export default function SettlementPage() {
           })()}
         </FadeContent>
       ) : (
-        <div className="text-center py-32 glass-panel rounded-[40px] border-dashed border-2 border-white/5">
-          <p className="text-text-sub">暂无结算数据。</p>
+        <div className="text-center py-32 bg-black/10 backdrop-blur-xl rounded-[40px] border-dashed border-2 border-white/10 shadow-lg">
+          <p className="text-white/80 font-medium drop-shadow-sm">暂无结算数据。</p>
         </div>
       )}
     </div>

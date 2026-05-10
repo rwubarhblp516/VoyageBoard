@@ -41,7 +41,7 @@ export default function AppleSelect({ isOpen, onClose, options, value, onChange,
 
             <div className="px-6 py-4 flex justify-between items-center border-b border-white/5">
               <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-bold text-text-sub uppercase tracking-[0.25em]">Voyage Picker</span>
+                <span className="text-[9px] font-bold text-text-sub uppercase tracking-[0.25em]">选择器</span>
                 <span className="text-lg font-medium text-white">{title}</span>
               </div>
               <button 

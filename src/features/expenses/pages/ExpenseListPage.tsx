@@ -2,27 +2,34 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
-import { Plus, Loader2, Utensils, Fuel, Car, MapPin, Ticket, ShoppingBag, Hotel, Zap, MoreHorizontal, ReceiptText } from 'lucide-react'
+import { Plus, Loader2, Utensils, Car, Ticket, ShoppingBag, Hotel, MoreHorizontal, ReceiptText, Plane, Train, ShoppingBasket, Tag, Bus, Search, Trash2 } from 'lucide-react'
 import AddExpenseForm from '../components/AddExpenseForm'
-import { ExpenseCategory } from '@/types/expense'
 import { format } from 'date-fns'
+import { motion } from 'framer-motion'
 
-const categoryIcons: Record<ExpenseCategory, React.ReactNode> = {
+const categoryIcons: Record<string, React.ReactNode> = {
   food: <Utensils className="w-5 h-5" />,
-  gas: <Fuel className="w-5 h-5" />,
+  hotel: <Hotel className="w-5 h-5" />,
+  transport: <Bus className="w-5 h-5" />,
+  flight: <Plane className="w-5 h-5" />,
+  train: <Train className="w-5 h-5" />,
   car_rental: <Car className="w-5 h-5" />,
-  parking: <MapPin className="w-5 h-5" />,
-  toll: <Zap className="w-5 h-5" />,
   ticket: <Ticket className="w-5 h-5" />,
   shopping: <ShoppingBag className="w-5 h-5" />,
-  hotel: <Hotel className="w-5 h-5" />,
   entertainment: <MoreHorizontal className="w-5 h-5" />,
-  other: <MoreHorizontal className="w-5 h-5" />,
+  grocery: <ShoppingBasket className="w-5 h-5" />,
+  other: <Tag className="w-5 h-5" />,
+}
+
+const getCategoryIcon = (category: string) => {
+  return categoryIcons[category] || <Tag className="w-5 h-5" />
 }
 
 export default function ExpenseListPage() {
   const { currentTrip } = useTripStore()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<any>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const queryClient = useQueryClient()
 
   const { data: expenses, isLoading } = useQuery({
@@ -31,65 +38,128 @@ export default function ExpenseListPage() {
       if (!currentTrip) return []
       const { data, error } = await supabase
         .from('expenses')
-        .select('*, payer:trip_members!payer_member_id(display_name)')
+        .select('*, payer:trip_members!payer_member_id(display_name), participants:expense_participants(member_id)')
         .eq('trip_id', currentTrip.id)
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return data as (any & { payer: { display_name: string } })[]
+      return data as (any & { payer: { display_name: string }, participants: any[] })[]
     },
     enabled: !!currentTrip,
   })
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    if (!window.confirm('确认删除这笔账单吗？')) return
+    try {
+      const { error } = await supabase.from('expenses').delete().eq('id', id)
+      if (error) throw error
+      queryClient.invalidateQueries({ queryKey: ['expenses', currentTrip?.id] })
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  const filteredExpenses = expenses?.filter(expense => 
+    expense.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    expense.category.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       
-      <header className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-6">
-        <div>
-          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">记账账单</h1>
-          <p className="text-text-sub font-medium">清楚记录，享受每一次探索。</p>
+      <header className="flex flex-col mb-10 gap-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div>
+            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">记账账单</h1>
+            <p className="text-text-sub font-medium">清楚记录，享受每一次探索。</p>
+          </div>
+          
+          <button
+            onClick={() => {
+              setEditingExpense(null)
+              setShowAddForm(true)
+            }}
+            className="group relative px-6 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden shadow-xl shrink-0"
+          >
+            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Plus className="w-4 h-4 relative z-10" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] relative z-10">记一笔</span>
+          </button>
         </div>
-        
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="group relative px-6 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden shadow-xl shrink-0"
-        >
-          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <Plus className="w-4 h-4 relative z-10" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] relative z-10">记一笔</span>
-        </button>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-white/30" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜索账单标题或分类..."
+            className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all font-medium shadow-inner placeholder:text-white/50"
+          />
+        </div>
       </header>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">
           <Loader2 className="w-10 h-10 animate-spin text-white/10" />
         </div>
-      ) : expenses && expenses.length > 0 ? (
+      ) : filteredExpenses && filteredExpenses.length > 0 ? (
         <div className="space-y-4">
-          {expenses.map((expense) => (
-            <div key={expense.id} className="glass-card flex items-center gap-4 sm:gap-6 group cursor-default p-5 rounded-[28px] border-white/5 transition-all hover:border-white/10">
-              <div className="w-14 h-14 rounded-[20px] bg-white/5 flex items-center justify-center text-white shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:bg-white/10 border border-white/5">
-                {categoryIcons[expense.category as ExpenseCategory]}
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <h3 className="text-white font-bold text-lg truncate mb-1">{expense.title}</h3>
-                <div className="flex items-center gap-2 text-xs text-text-sub font-medium">
-                  <span>{format(new Date(expense.expense_date), 'M月d日')}</span>
-                  <span className="w-1 h-1 rounded-full bg-white/20" />
-                  <span className="truncate">{expense.payer?.display_name} 支付</span>
+          {filteredExpenses.map((expense) => {
+            const isIndividual = expense.participants?.length === 1 && expense.participants[0].member_id === expense.payer_member_id
+            
+            return (
+            <div key={expense.id} className="relative rounded-[28px] overflow-hidden w-full">
+              <motion.div 
+                drag="x"
+                dragConstraints={{ left: -80, right: 0 }}
+                dragElastic={0.1}
+                onClick={() => {
+                  setEditingExpense(expense)
+                  setShowAddForm(true)
+                }}
+                className="relative z-10 glass-card flex items-center gap-4 sm:gap-6 cursor-pointer p-5 rounded-[28px] border-white/5 transition-colors hover:border-white/10 w-full"
+              >
+                <div className="w-14 h-14 rounded-[20px] bg-white/5 flex items-center justify-center text-white shrink-0 border border-white/5">
+                  {getCategoryIcon(expense.category)}
                 </div>
-              </div>
-              
-              <div className="text-right">
-                <p className="text-2xl sm:text-3xl font-mono font-black text-white tracking-tighter">
-                  {(Number(expense.amount) / 100).toFixed(2)}
-                </p>
-                <p className="text-[10px] text-text-sub font-bold uppercase tracking-widest">{currentTrip?.currency}</p>
-              </div>
+                
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-bold text-lg truncate mb-1">{expense.title}</h3>
+                  <div className="flex items-center gap-2 text-xs text-white/70 font-medium flex-wrap">
+                    <span>{format(new Date(expense.expense_date), 'M月d日')}</span>
+                    <span className="w-1 h-1 rounded-full bg-white/40" />
+                    <span className="truncate">{expense.payer?.display_name} 支付</span>
+                    <span className="text-[9px] font-bold bg-white/15 text-white px-1.5 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap">
+                      {isIndividual ? '个人' : 'AA'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="text-right pr-2">
+                  <p className="text-2xl sm:text-3xl font-mono font-black text-white tracking-tighter">
+                    {(Number(expense.amount) / 100).toFixed(2)}
+                  </p>
+                  <p className="text-[10px] text-white/70 font-bold uppercase tracking-widest">{currentTrip?.currency}</p>
+                </div>
+
+                {/* Attached Delete Button */}
+                <button
+                  onClick={(e) => handleDelete(e, expense.id)}
+                  className="absolute inset-y-0 -right-[80px] w-[80px] bg-red-500/80 hover:bg-red-500 flex flex-col items-center justify-center text-white transition-colors"
+                >
+                  <Trash2 className="w-5 h-5 mb-1" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">删除</span>
+                </button>
+              </motion.div>
             </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="text-center py-32 glass-panel rounded-[44px] border-dashed border-2 border-white/5 hover:border-white/10 transition-colors">
@@ -109,7 +179,11 @@ export default function ExpenseListPage() {
 
       {showAddForm && (
         <AddExpenseForm
-          onClose={() => setShowAddForm(false)}
+          editingExpense={editingExpense}
+          onClose={() => {
+            setShowAddForm(false)
+            setEditingExpense(null)
+          }}
           onSuccess={() => queryClient.invalidateQueries({ queryKey: ['expenses', currentTrip?.id] })}
         />
       )}

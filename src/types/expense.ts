@@ -1,14 +1,16 @@
 export type ExpenseCategory =
   | 'hotel'
   | 'food'
-  | 'gas'
-  | 'parking'
-  | 'toll'
+  | 'transport'
+  | 'flight'
+  | 'train'
+  | 'car_rental'
   | 'ticket'
   | 'shopping'
-  | 'car_rental'
   | 'entertainment'
+  | 'grocery'
   | 'other'
+  | (string & {})
 
 export interface Expense {
   id: string

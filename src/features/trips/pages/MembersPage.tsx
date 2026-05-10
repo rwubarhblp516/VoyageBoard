@@ -152,14 +152,14 @@ export default function MembersPage() {
                         <>
                           <h3 className="text-white font-black text-xl tracking-tight truncate">{member.display_name}</h3>
                           {isCurrentUser && (
-                            <span className="text-[9px] font-black bg-white text-black px-2 py-0.5 rounded-full uppercase tracking-widest">YOU</span>
+                            <span className="text-[9px] font-black bg-white text-black px-2 py-0.5 rounded-full uppercase tracking-widest">你自己</span>
                           )}
                         </>
                       )}
                     </div>
                     {!isEditing && (
                       <div className="flex items-center gap-2 text-[10px] font-bold text-text-sub uppercase tracking-widest">
-                        <span>{member.role === 'owner' ? 'Voyage Host' : 'Adventurer'}</span>
+                        <span>{member.role === 'owner' ? '旅程发起人' : '同行伙伴'}</span>
                       </div>
                     )}
                   </div>
@@ -184,7 +184,7 @@ export default function MembersPage() {
       )}
 
       <div className="mt-12 glass-panel p-10 rounded-[44px] border-dashed border-2 border-white/5 text-center group transition-all hover:border-white/10">
-        <p className="text-text-sub font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white transition-colors">Your Invitation Code</p>
+        <p className="text-text-sub font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white transition-colors">您的专属邀请码</p>
         <div className="inline-flex items-center gap-4 px-6 py-3 bg-black/40 rounded-2xl border border-white/10 font-mono text-xs text-white group-hover:border-white/20 transition-all">
           {currentTrip?.id}
         </div>

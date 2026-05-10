@@ -15,9 +15,12 @@ import CreateTripPage from '@/features/trips/pages/CreateTripPage'
 import MembersPage from '@/features/trips/pages/MembersPage'
 import ExpenseListPage from '@/features/expenses/pages/ExpenseListPage'
 import SettlementPage from '@/features/expenses/pages/SettlementPage'
+import ChecklistPage from '@/features/trips/pages/ChecklistPage'
 import FadeContent from '@/components/FadeContent'
-import { ArrowLeft, Receipt, LayoutDashboard } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Map, Utensils, Hotel, Bus, Plane, Train, Car, Ticket, ShoppingBag, MoreHorizontal, ShoppingBasket, Tag } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useQuery } from '@tanstack/react-query'
+import { calculateTransfers, MemberBalance } from '@/lib/settlement'
 
 const queryClient = new QueryClient()
 
@@ -58,6 +61,97 @@ function TripDashboard() {
     return <Navigate to="/trips" replace />
   }
 
+  const { data: dashboardData } = useQuery({
+    queryKey: ['dashboard', currentTrip.id],
+    queryFn: async () => {
+      // Fetch members
+      const { data: members } = await supabase
+        .from('trip_members')
+        .select('*')
+        .eq('trip_id', currentTrip.id)
+
+      // Fetch expenses
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('trip_id', currentTrip.id)
+
+      // Fetch participants
+      const { data: participants } = await supabase
+        .from('expense_participants')
+        .select('*, expenses!inner(trip_id)')
+        .eq('expenses.trip_id', currentTrip.id)
+
+      if (!members || !expenses || !participants) return { totalExpense: 0, perCapitaExpense: 0, pendingSettlement: 0, transfers: [], categories: [] }
+
+      const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+      const memberCount = members.length || 1
+      const perCapitaExpense = totalExpense / memberCount
+
+      const balances: MemberBalance[] = members.map(m => {
+        const paidAmount = expenses
+          .filter(e => e.payer_member_id === m.id)
+          .reduce((sum, e) => sum + Number(e.amount), 0)
+
+        const owedAmount = (participants as any[])
+          .filter(p => p.member_id === m.id)
+          .reduce((sum, p) => sum + Number(p.calculated_amount), 0)
+
+        return {
+          memberId: m.id,
+          displayName: m.display_name,
+          balance: paidAmount - owedAmount,
+        }
+      })
+
+      const transfers = calculateTransfers(balances)
+      const pendingSettlement = transfers.reduce((sum, t) => sum + t.amount, 0)
+
+      // Category breakdown
+      const categoryTotals: Record<string, number> = {}
+      expenses.forEach(e => {
+        categoryTotals[e.category] = (categoryTotals[e.category] || 0) + Number(e.amount)
+      })
+
+      const categories = Object.entries(categoryTotals)
+        .map(([category, total]) => ({
+          category,
+          total,
+          perCapita: total / memberCount
+        }))
+        .sort((a, b) => b.total - a.total)
+
+      return { totalExpense, perCapitaExpense, pendingSettlement, transfers, categories }
+    },
+    enabled: !!currentTrip,
+  })
+
+  const totalExpenseDisplay = dashboardData ? (dashboardData.totalExpense / 100).toFixed(2) : '0.00'
+  const perCapitaExpenseDisplay = dashboardData ? (dashboardData.perCapitaExpense / 100).toFixed(2) : '0.00'
+
+  const categoryLabels: Record<string, string> = {
+    food: '餐饮', hotel: '住宿', transport: '交通', flight: '机票',
+    train: '火车/高铁', car_rental: '打车/租车', ticket: '门票',
+    shopping: '购物', entertainment: '娱乐', grocery: '杂货/超市', other: '其他'
+  }
+
+  const getCategoryIcon = (category: string) => {
+    const icons: Record<string, React.ReactNode> = {
+      food: <Utensils className="w-5 h-5" />,
+      hotel: <Hotel className="w-5 h-5" />,
+      transport: <Bus className="w-5 h-5" />,
+      flight: <Plane className="w-5 h-5" />,
+      train: <Train className="w-5 h-5" />,
+      car_rental: <Car className="w-5 h-5" />,
+      ticket: <Ticket className="w-5 h-5" />,
+      shopping: <ShoppingBag className="w-5 h-5" />,
+      entertainment: <MoreHorizontal className="w-5 h-5" />,
+      grocery: <ShoppingBasket className="w-5 h-5" />,
+      other: <Tag className="w-5 h-5" />,
+    }
+    return icons[category] || <Tag className="w-5 h-5" />
+  }
+
   return (
     <FadeContent blur={true} duration={800}>
       <div className="space-y-12">
@@ -81,76 +175,101 @@ function TripDashboard() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="glass-card p-8 rounded-[32px] space-y-6 relative overflow-hidden group border border-white/5"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Receipt className="w-12 h-12 text-white" />
-            </div>
-            <span className="block text-sm font-bold text-text-sub uppercase tracking-[0.15em]">总支出</span>
-            <div className="space-y-1">
+        {/* 全新设计的总览大卡片 */}
+        <motion.div 
+          className="glass-card p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] border border-white/10 shadow-2xl relative overflow-hidden"
+        >
+          {/* 大数据头部：总计与人均 */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-10">
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />
+                总支出
+              </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-black text-white tracking-tighter">0.00</span>
+                <span className="text-6xl sm:text-7xl font-black text-white tracking-tighter tabular-nums leading-none">{totalExpenseDisplay}</span>
+                <span className="text-sm font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
+              </div>
+            </div>
+            
+            <div className="md:text-right space-y-3 p-5 md:p-0 bg-white/5 md:bg-transparent rounded-2xl md:rounded-none border border-white/5 md:border-none">
+              <span className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center md:justify-end gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#FFB800]" />
+                人均花费
+              </span>
+              <div className="flex items-baseline gap-2 md:justify-end">
+                <span className="text-4xl sm:text-5xl font-black text-[#FFB800] tracking-tighter tabular-nums leading-none">{perCapitaExpenseDisplay}</span>
                 <span className="text-xs font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
               </div>
-              <p className="text-[10px] text-text-sub font-medium">本旅程所有成员累计支出</p>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="glass-card p-8 rounded-[32px] space-y-6 relative overflow-hidden group border border-white/5"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <LayoutDashboard className="w-12 h-12 text-white" />
-            </div>
-            <span className="block text-sm font-bold text-text-sub uppercase tracking-[0.15em]">待结算</span>
-            <div className="space-y-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-black text-white tracking-tighter text-[#FFB800]">0.00</span>
-                <span className="text-xs font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
+          {/* 分类支出明细 */}
+          {dashboardData && dashboardData.categories.length > 0 && (
+            <div className="pt-8 border-t border-white/5">
+              <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em] mb-6">分类支出明细</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {dashboardData.categories.map((c, idx) => (
+                  <div key={idx} className="bg-white/5 hover:bg-white/10 rounded-[20px] p-4 flex items-center gap-4 transition-colors border border-white/5">
+                    <div className="w-12 h-12 rounded-[14px] bg-black/20 flex items-center justify-center text-white shrink-0 border border-white/5">
+                      {getCategoryIcon(c.category)}
+                    </div>
+                    <div className="flex-1 min-w-0 py-0.5">
+                      <div className="flex justify-between items-baseline mb-1.5">
+                        <span className="text-sm font-bold text-white truncate pr-2">
+                          {categoryLabels[c.category] || c.category}
+                        </span>
+                        <span className="text-base font-mono font-black text-white tracking-tight tabular-nums">
+                          {(c.total / 100).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-bold text-text-sub uppercase tracking-wider">
+                        <span>总花费</span>
+                        <span className="text-[#FFB800]/90">人均 {(c.perCapita / 100).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="text-[10px] text-text-sub font-medium">当前仍有待确认的款项</p>
             </div>
-          </motion.div>
+          )}
+        </motion.div>
 
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="glass-card p-8 rounded-[32px] space-y-6 relative overflow-hidden group border border-white/5"
-          >
-            <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-              <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-emerald-500 animate-pulse" />
-              </div>
+        {/* 核心需求：直观展示谁该付给谁多少钱 */}
+        {dashboardData && dashboardData.transfers.length > 0 && (
+          <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white tracking-tight">平摊结算方案</h2>
             </div>
-            <span className="block text-sm font-bold text-text-sub uppercase tracking-[0.15em]">旅程状态</span>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Active</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {dashboardData.transfers.map((t, i) => (
+                <div key={i} className="glass-card p-5 sm:p-6 rounded-[28px] flex flex-col sm:flex-row items-center justify-between gap-4 border-white/5 hover:border-white/10 transition-colors">
+                  <div className="flex-1 text-center sm:text-left flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">付款方</span>
+                    <span className="text-white font-bold text-lg">{t.fromDisplayName}</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1 px-4">
+                    <span className="text-xl sm:text-2xl font-mono font-black text-[#0A84FF]">
+                      {(t.amount / 100).toFixed(2)}
+                    </span>
+                    <div className="flex items-center text-[#0A84FF]/60 text-[10px] font-bold uppercase tracking-widest">
+                      <span>支付给</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </div>
+                  </div>
+                  <div className="flex-1 text-center sm:text-right flex flex-col gap-1">
+                    <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">收款方</span>
+                    <span className="text-white font-bold text-lg">{t.toDisplayName}</span>
+                  </div>
                 </div>
-                <span className="text-xl font-bold text-white tracking-tight">进行中</span>
-              </div>
-              <p className="text-[10px] text-text-sub font-medium">当前旅程处于活跃状态</p>
+              ))}
             </div>
-          </motion.div>
-        </div>
+          </div>
+        )}
       </div>
     </FadeContent>
   )
 }
-
-const Itinerary = () => (
-  <div className="py-8">
-    <h1 className="text-3xl font-bold text-text-primary">行程规划</h1>
-    <p className="text-text-secondary mt-1 italic">为您规划更高效的路线...</p>
-    <div className="mt-8 glass p-12 rounded-3xl text-center border-dashed border-2 border-accent-primary/20">
-      <p className="text-text-muted">行程管理功能即将上线。</p>
-    </div>
-  </div>
-)
 
 const Settings = () => {
   const { signOut } = useAuthStore()
@@ -213,7 +332,7 @@ function App() {
                 </ProtectedRoute>
               }>
                 <Route index element={<TripDashboard />} />
-                <Route path="itinerary" element={<Itinerary />} />
+                <Route path="checklist" element={<ChecklistPage />} />
                 <Route path="expenses" element={<ExpenseListPage />} />
                 <Route path="settlement" element={<SettlementPage />} />
                 <Route path="members" element={<MembersPage />} />

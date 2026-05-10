@@ -4,6 +4,8 @@ import {
   Receipt, 
   Settings as SettingsIcon, 
   Users,
+  ListTodo,
+  Calculator
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import LightPillar from '@/components/LightPillar'
@@ -14,7 +16,9 @@ export default function MainLayout() {
 
   const navItems = [
     { id: '/', icon: LayoutDashboard, label: '总览' },
+    { id: '/checklist', icon: ListTodo, label: '清单' },
     { id: '/expenses', icon: Receipt, label: '记账' },
+    { id: '/settlement', icon: Calculator, label: '结算' },
     { id: '/settings', icon: SettingsIcon, label: '设置' },
   ]
 
@@ -66,7 +70,7 @@ export default function MainLayout() {
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`relative flex flex-col items-center justify-center gap-1.5 w-24 py-3 rounded-2xl transition-all duration-500 group ${
+                className={`relative flex flex-col items-center justify-center gap-1.5 flex-1 py-3 rounded-2xl transition-all duration-500 group ${
                   isActive 
                     ? 'text-white' 
                     : 'text-text-sub hover:text-white'
@@ -75,19 +79,14 @@ export default function MainLayout() {
                 {isActive && (
                   <motion.div 
                     layoutId="nav-bg"
-                    className="absolute inset-0 bg-white/5 rounded-2xl border border-white/5" 
+                    className="absolute inset-0 bg-white/10 rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]" 
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                   />
                 )}
-                <Icon className={`h-5 w-5 relative z-10 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                <span className={`text-[10px] font-bold tracking-[0.2em] relative z-10 transition-all duration-500 ${isActive ? 'text-white' : 'text-text-sub'}`}>
+                <Icon className={`h-5 w-5 relative z-10 transition-all duration-500 ${isActive ? 'scale-110 text-white drop-shadow-md' : 'text-text-sub group-hover:scale-110 group-hover:text-white'}`} />
+                <span className={`text-[10px] font-bold tracking-[0.2em] relative z-10 transition-all duration-500 mt-1 ${isActive ? 'text-white drop-shadow-md' : 'text-text-sub group-hover:text-white'}`}>
                   {item.label}
                 </span>
-                {isActive && (
-                  <motion.div 
-                    layoutId="nav-dot"
-                    className="absolute -bottom-1 w-1 h-1 bg-[#0A84FF] rounded-full shadow-[0_0_8px_#0A84FF]" 
-                  />
-                )}
               </button>
             )
           })}

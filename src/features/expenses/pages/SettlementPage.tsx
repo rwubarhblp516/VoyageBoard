@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { calculateTransfers, MemberBalance } from '@/lib/settlement'
-import { Loader2, ArrowRight } from 'lucide-react'
+import { Loader2, CheckCircle2 } from 'lucide-react'
 import FadeContent from '@/components/FadeContent'
 
 export default function SettlementPage() {
@@ -57,75 +57,91 @@ export default function SettlementPage() {
   })
 
   return (
-    <div className="py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-text-primary">AA 结算</h1>
-        <p className="text-text-secondary mt-1">算清账目，友谊长存。</p>
-      </div>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <header className="mb-10">
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">结算</h1>
+        <p className="text-text-sub font-medium mt-2">清晰的收支明细，群内发红包即可。</p>
+      </header>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-accent-primary" />
+        <div className="flex items-center justify-center py-32">
+          <Loader2 className="w-10 h-10 animate-spin text-white/10" />
         </div>
       ) : settlementData ? (
-        <FadeContent duration={600} className="space-y-8">
-          {/* Balances Section */}
-          <section>
-            <h2 className="text-xs font-bold text-text-muted uppercase mb-4 tracking-widest">成员收支概览</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {settlementData.balances.map((b) => (
-                <div key={b.memberId} className="glass p-5 rounded-2xl flex items-center justify-between border-none">
-                  <div>
-                    <p className="text-text-primary font-bold text-lg">{b.displayName}</p>
-                    <p className={`text-xs font-bold uppercase mt-1 ${b.balance >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
-                      {b.balance >= 0 ? '应收' : '应付'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-2xl font-mono font-bold ${b.balance >= 0 ? 'text-accent-success' : 'text-accent-danger'}`}>
-                      {Math.abs(b.balance / 100).toFixed(2)}
-                    </p>
-                    <p className="text-[10px] text-text-muted font-bold">{currentTrip?.currency}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+        <FadeContent duration={600} className="space-y-12">
+          {(() => {
+            const positiveBalances = settlementData.balances.filter(b => b.balance > 0).sort((a, b) => b.balance - a.balance)
+            const negativeBalances = settlementData.balances.filter(b => b.balance < 0).sort((a, b) => a.balance - b.balance)
+            const isAllSettled = positiveBalances.length === 0 && negativeBalances.length === 0
 
-          {/* Transfers Section */}
-          <section>
-            <h2 className="text-xs font-bold text-text-muted uppercase mb-4 tracking-widest">建议转账方案</h2>
-            {settlementData.transfers.length > 0 ? (
-              <div className="space-y-4">
-                {settlementData.transfers.map((t, i) => (
-                  <div key={i} className="glass-strong p-6 rounded-3xl flex flex-col sm:flex-row items-center gap-4 sm:gap-8 border-none">
-                    <div className="flex-1 text-center sm:text-right">
-                      <p className="text-text-muted text-xs uppercase mb-1 font-bold">付款方</p>
-                      <p className="text-text-primary font-bold text-xl">{t.fromDisplayName}</p>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <p className="text-accent-primary font-mono font-bold text-2xl">
-                        {(t.amount / 100).toFixed(2)} {currentTrip?.currency}
-                      </p>
-                      <ArrowRight className="h-6 w-6 text-accent-primary animate-pulse" />
-                    </div>
-                    <div className="flex-1 text-center sm:text-left">
-                      <p className="text-text-muted text-xs uppercase mb-1 font-bold">收款方</p>
-                      <p className="text-text-primary font-bold text-xl">{t.toDisplayName}</p>
-                    </div>
+            if (isAllSettled) {
+              return (
+                <div className="text-center py-20 bg-white/5 rounded-[40px] border border-white/5">
+                  <div className="w-16 h-16 bg-emerald-400/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 glass rounded-3xl border-none">
-                <p className="text-accent-success font-bold text-lg">账目已平！无需进行转账。</p>
-              </div>
-            )}
-          </section>
+                  <h3 className="text-xl font-bold text-emerald-400 mb-2">没有任何欠款！</h3>
+                  <p className="text-text-sub text-sm">目前账目完全平衡，不需要发红包转账。</p>
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {/* 应收名单 */}
+                {positiveBalances.length > 0 && (
+                  <section>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <span className="w-1.5 h-6 bg-emerald-400 rounded-full"></span>
+                      谁需要收钱 (应收)
+                    </h2>
+                    <div className="grid grid-cols-1 gap-4">
+                      {positiveBalances.map((b) => (
+                        <div key={b.memberId} className="bg-white/5 border border-emerald-400/20 p-6 rounded-[24px] flex items-center justify-between">
+                          <p className="text-white font-bold text-2xl">{b.displayName}</p>
+                          <div className="text-right flex items-baseline gap-1">
+                            <span className="text-emerald-400 font-bold text-sm mr-1">应收</span>
+                            <p className="text-3xl sm:text-4xl font-mono font-black tracking-tighter text-emerald-400">
+                              {(b.balance / 100).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-emerald-400/60 font-bold uppercase ml-1">{currentTrip?.currency}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* 应付名单 */}
+                {negativeBalances.length > 0 && (
+                  <section>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <span className="w-1.5 h-6 bg-rose-400 rounded-full"></span>
+                      谁需要出钱 (应付)
+                    </h2>
+                    <div className="grid grid-cols-1 gap-4">
+                      {negativeBalances.map((b) => (
+                        <div key={b.memberId} className="bg-white/5 border border-rose-400/20 p-6 rounded-[24px] flex items-center justify-between">
+                          <p className="text-white font-bold text-2xl">{b.displayName}</p>
+                          <div className="text-right flex items-baseline gap-1">
+                            <span className="text-rose-400 font-bold text-sm mr-1">需付</span>
+                            <p className="text-3xl sm:text-4xl font-mono font-black tracking-tighter text-rose-400">
+                              {Math.abs(b.balance / 100).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-rose-400/60 font-bold uppercase ml-1">{currentTrip?.currency}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
+            )
+          })()}
         </FadeContent>
       ) : (
-        <div className="text-center py-20 glass rounded-3xl border-none">
-          <p className="text-text-muted">暂无结算数据。</p>
+        <div className="text-center py-32 glass-panel rounded-[40px] border-dashed border-2 border-white/5">
+          <p className="text-text-sub">暂无结算数据。</p>
         </div>
       )}
     </div>

@@ -2,8 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { Loader2, User, Shield, Edit2, Check } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { Loader2, User, Shield, Edit2, Check, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TripMember } from '@/types/trip'
 
@@ -15,6 +15,7 @@ export default function MembersPage() {
   const queryClient = useQueryClient()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
+  const [newAvatarUrl, setNewAvatarUrl] = useState<string | null>(null)
 
   if (!currentTrip) {
     return <Navigate to="/trips" replace />
@@ -38,13 +39,16 @@ export default function MembersPage() {
 
   const isLoading = membersLoading || authLoading
 
-  const handleUpdateName = async (memberId: string) => {
+  const handleUpdateProfile = async (memberId: string) => {
     if (!newName.trim()) return
 
     try {
       const { error } = await supabase
         .from('trip_members')
-        .update({ display_name: newName.trim() })
+        .update({ 
+          display_name: newName.trim(),
+          avatar_url: newAvatarUrl 
+        } as any)
         .eq('id', memberId)
 
       if (error) throw error
@@ -54,6 +58,12 @@ export default function MembersPage() {
     } catch (error: any) {
       alert(error.message)
     }
+  }
+
+  const shuffleAvatar = () => {
+    const seeds = ['Felix', 'Aneka', 'Oliver', 'Mimi', 'Lola', 'Molly', 'Jack', 'Lucy', 'Leo', 'Mia', 'Coco', 'Sasha', 'Jasper', 'Buster', 'Cleo', 'Shadow', 'Buddy', 'Oscar', 'Daisy', 'Sam']
+    const randomSeed = seeds[Math.floor(Math.random() * seeds.length)] + Math.floor(Math.random() * 1000)
+    setNewAvatarUrl(`https://api.dicebear.com/9.x/micah/svg?seed=${randomSeed}&backgroundColor=transparent`)
   }
 
   const handleCopyInvite = () => {
@@ -101,10 +111,23 @@ export default function MembersPage() {
                     isCurrentUser ? 'bg-white/[0.04] border-white/20' : 'border-white/5'
                   }`}
                 >
-                  <div className={`w-16 h-16 rounded-[22px] flex items-center justify-center shrink-0 border border-white/5 ${
+                  <div className={`relative w-16 h-16 rounded-[22px] overflow-hidden flex items-center justify-center shrink-0 border border-white/5 transition-all ${
                     member.role === 'owner' ? 'bg-white/10 text-white' : 'bg-white/5 text-white/30'
                   }`}>
-                    {member.role === 'owner' ? <Shield className="w-7 h-7" /> : <User className="w-7 h-7" />}
+                    {(isEditing ? newAvatarUrl : member.avatar_url) ? (
+                      <img src={(isEditing ? newAvatarUrl : member.avatar_url) || undefined} alt={member.display_name} className="w-full h-full object-cover" />
+                    ) : (
+                      member.role === 'owner' ? <Shield className="w-7 h-7" /> : <User className="w-7 h-7" />
+                    )}
+                    
+                    {isEditing && (
+                      <button
+                        onClick={shuffleAvatar}
+                        className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-5 h-5 text-white" />
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -115,11 +138,11 @@ export default function MembersPage() {
                             autoFocus
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateName(member.id)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateProfile(member.id)}
                             className="bg-black/40 border border-white/20 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-white/40 w-full"
                           />
                           <button 
-                            onClick={() => handleUpdateName(member.id)}
+                            onClick={() => handleUpdateProfile(member.id)}
                             className="p-2 bg-white text-black rounded-xl hover:bg-white/80 transition-all shadow-lg"
                           >
                             <Check className="w-4 h-4" />
@@ -146,6 +169,7 @@ export default function MembersPage() {
                       onClick={() => {
                         setEditingId(member.id)
                         setNewName(member.display_name)
+                        setNewAvatarUrl(member.avatar_url)
                       }}
                       className="p-3 rounded-2xl bg-white/5 text-white hover:bg-white/10 border border-white/5 transition-all shadow-sm"
                     >

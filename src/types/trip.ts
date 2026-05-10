@@ -16,4 +16,5 @@ export interface TripMember {
   display_name: string
   role: string | null
   joined_at: string | null
+  avatar_url: string | null
 }

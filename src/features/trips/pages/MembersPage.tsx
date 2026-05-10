@@ -197,14 +197,14 @@ export default function MembersPage() {
         </div>
       )}
 
-      <div className="mt-12 bg-black/15 backdrop-blur-xl p-10 rounded-[44px] border-dashed border-2 border-white/15 text-center group transition-all hover:border-white/25 shadow-lg">
+      <div className="mt-12 bg-black/15 backdrop-blur-xl px-6 py-8 rounded-[32px] border-dashed border-2 border-white/15 text-center group transition-all hover:border-white/25 shadow-lg">
         <p className="text-white/80 font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white transition-colors drop-shadow-sm">您的专属邀请链接</p>
         <button
           onClick={handleGenerateInviteLink}
-          className="inline-flex items-center gap-3 px-6 py-3 bg-black/30 rounded-2xl border border-white/15 font-mono text-xs text-white group-hover:border-white/25 transition-all hover:bg-black/40 active:scale-95 shadow-md cursor-pointer"
+          className="w-full flex items-center justify-center gap-3 px-5 py-3 bg-black/30 rounded-2xl border border-white/15 font-mono text-xs text-white group-hover:border-white/25 transition-all hover:bg-black/40 active:scale-95 shadow-md cursor-pointer overflow-hidden"
         >
-          {copied ? <CheckCheck className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-white/60" />}
-          <span className="truncate max-w-[280px]">{`${window.location.origin}/join/${currentTrip?.id}`}</span>
+          {copied ? <CheckCheck className="w-4 h-4 text-emerald-400 shrink-0" /> : <Copy className="w-4 h-4 text-white/60 shrink-0" />}
+          <span className="truncate">{`${window.location.origin}/join/${currentTrip?.id}`}</span>
         </button>
       </div>
     </div>

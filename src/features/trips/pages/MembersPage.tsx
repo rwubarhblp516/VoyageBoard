@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { Loader2, User, Shield, Edit2, Check, RefreshCw } from 'lucide-react'
+import { Loader2, User, Shield, Edit2, Check, RefreshCw, Link2, Copy, CheckCheck } from 'lucide-react'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TripMember } from '@/types/trip'
@@ -66,25 +66,39 @@ export default function MembersPage() {
     setNewAvatarUrl(`https://api.dicebear.com/9.x/micah/svg?seed=${randomSeed}&backgroundColor=transparent`)
   }
 
-  const handleCopyInvite = () => {
+  const [copied, setCopied] = useState(false)
+
+  const handleGenerateInviteLink = () => {
     if (!currentTrip) return
-    navigator.clipboard.writeText(currentTrip.id)
-    alert('邀请码已复制！分享给好友即可加入。')
+    const baseUrl = window.location.origin
+    const inviteUrl = `${baseUrl}/join/${currentTrip.id}`
+    navigator.clipboard.writeText(inviteUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2500)
   }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       <header className="flex items-end justify-between mb-12 gap-4">
         <div>
-          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">成员管理</h1>
-          <p className="text-text-sub font-medium">谁在和你一起探索世界？</p>
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">成员管理</h1>
+          <p className="text-white/80 font-medium drop-shadow-sm">谁在和你一起探索世界？</p>
         </div>
         <button
-          onClick={handleCopyInvite}
-          className="group relative px-6 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-xl"
+          onClick={handleGenerateInviteLink}
+          className="group relative px-6 py-3 bg-black/20 backdrop-blur-md border border-white/20 rounded-2xl text-white transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-lg hover:bg-black/30 hover:border-white/30 active:scale-95"
         >
-          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] relative z-10">邀请伙伴</span>
+          {copied ? (
+            <>
+              <CheckCheck className="w-4 h-4 text-emerald-400" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400">已复制</span>
+            </>
+          ) : (
+            <>
+              <Link2 className="w-4 h-4" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">邀请伙伴</span>
+            </>
+          )}
         </button>
       </header>
 
@@ -158,7 +172,7 @@ export default function MembersPage() {
                       )}
                     </div>
                     {!isEditing && (
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-text-sub uppercase tracking-widest">
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-white/70 uppercase tracking-widest drop-shadow-sm">
                         <span>{member.role === 'owner' ? '旅程发起人' : '同行伙伴'}</span>
                       </div>
                     )}
@@ -183,11 +197,15 @@ export default function MembersPage() {
         </div>
       )}
 
-      <div className="mt-12 glass-panel p-10 rounded-[44px] border-dashed border-2 border-white/5 text-center group transition-all hover:border-white/10">
-        <p className="text-text-sub font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white transition-colors">您的专属邀请码</p>
-        <div className="inline-flex items-center gap-4 px-6 py-3 bg-black/40 rounded-2xl border border-white/10 font-mono text-xs text-white group-hover:border-white/20 transition-all">
-          {currentTrip?.id}
-        </div>
+      <div className="mt-12 bg-black/15 backdrop-blur-xl p-10 rounded-[44px] border-dashed border-2 border-white/15 text-center group transition-all hover:border-white/25 shadow-lg">
+        <p className="text-white/80 font-bold text-[10px] uppercase tracking-[0.4em] mb-4 group-hover:text-white transition-colors drop-shadow-sm">您的专属邀请链接</p>
+        <button
+          onClick={handleGenerateInviteLink}
+          className="inline-flex items-center gap-3 px-6 py-3 bg-black/30 rounded-2xl border border-white/15 font-mono text-xs text-white group-hover:border-white/25 transition-all hover:bg-black/40 active:scale-95 shadow-md cursor-pointer"
+        >
+          {copied ? <CheckCheck className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-white/60" />}
+          <span className="truncate max-w-[280px]">{`${window.location.origin}/join/${currentTrip?.id}`}</span>
+        </button>
       </div>
     </div>
   )

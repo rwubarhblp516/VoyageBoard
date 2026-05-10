@@ -27,8 +27,8 @@ export default function MainLayout() {
       {/* 还原高保真背景：通透、明亮、动感 */}
       <div className="fixed inset-0 z-0">
         <LightPillar
-          topColor="#a3e5ef" // Midnight/Slate black
-          bottomColor="#f3c7f3" // Deep Ocean Cyan
+          topColor="#7ee3f2ff" // Midnight/Slate black
+          bottomColor="#73d5f3" // Deep Ocean Cyan
           intensity={0.9}
           rotationSpeed={0.5}
           pillarRotation={25}

@@ -16,6 +16,7 @@ import MembersPage from '@/features/trips/pages/MembersPage'
 import ExpenseListPage from '@/features/expenses/pages/ExpenseListPage'
 import SettlementPage from '@/features/expenses/pages/SettlementPage'
 import ChecklistPage from '@/features/trips/pages/ChecklistPage'
+import JoinTripPage from '@/features/trips/pages/JoinTripPage'
 import FadeContent from '@/components/FadeContent'
 import { ArrowLeft, Utensils, Hotel, Bus, Plane, Train, Car, Ticket, ShoppingBag, MoreHorizontal, ShoppingBasket, Tag } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -324,6 +325,7 @@ function App() {
           <div className="min-h-screen text-text-primary">
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/join/:tripId" element={<JoinTripPage />} />
 
               <Route path="/trips" element={
                 <ProtectedRoute>

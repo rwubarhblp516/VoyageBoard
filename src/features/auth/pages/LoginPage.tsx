@@ -17,10 +17,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
-  // 如果已经登录，自动跳转到主页
+  // 如果已经登录，自动跳转（优先处理待加入的邀请链接）
   useEffect(() => {
     if (user) {
-      navigate('/', { replace: true })
+      const pendingJoin = sessionStorage.getItem('pendingJoinTrip')
+      if (pendingJoin) {
+        sessionStorage.removeItem('pendingJoinTrip')
+        navigate(`/join/${pendingJoin}`, { replace: true })
+      } else {
+        navigate('/', { replace: true })
+      }
     }
   }, [user, navigate])
 

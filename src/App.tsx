@@ -17,10 +17,9 @@ import ExpenseListPage from '@/features/expenses/pages/ExpenseListPage'
 import SettlementPage from '@/features/expenses/pages/SettlementPage'
 import ChecklistPage from '@/features/trips/pages/ChecklistPage'
 import FadeContent from '@/components/FadeContent'
-import { ArrowLeft, ArrowRight, Map, Utensils, Hotel, Bus, Plane, Train, Car, Ticket, ShoppingBag, MoreHorizontal, ShoppingBasket, Tag } from 'lucide-react'
+import { ArrowLeft, Utensils, Hotel, Bus, Plane, Train, Car, Ticket, ShoppingBag, MoreHorizontal, ShoppingBasket, Tag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
-import { calculateTransfers, MemberBalance } from '@/lib/settlement'
 
 const queryClient = new QueryClient()
 
@@ -82,30 +81,11 @@ function TripDashboard() {
         .select('*, expenses!inner(trip_id)')
         .eq('expenses.trip_id', currentTrip.id)
 
-      if (!members || !expenses || !participants) return { totalExpense: 0, perCapitaExpense: 0, pendingSettlement: 0, transfers: [], categories: [] }
+      if (!members || !expenses || !participants) return { totalExpense: 0, perCapitaExpense: 0, categories: [], memberSpending: [] }
 
       const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
       const memberCount = members.length || 1
       const perCapitaExpense = totalExpense / memberCount
-
-      const balances: MemberBalance[] = members.map(m => {
-        const paidAmount = expenses
-          .filter(e => e.payer_member_id === m.id)
-          .reduce((sum, e) => sum + Number(e.amount), 0)
-
-        const owedAmount = (participants as any[])
-          .filter(p => p.member_id === m.id)
-          .reduce((sum, p) => sum + Number(p.calculated_amount), 0)
-
-        return {
-          memberId: m.id,
-          displayName: m.display_name,
-          balance: paidAmount - owedAmount,
-        }
-      })
-
-      const transfers = calculateTransfers(balances)
-      const pendingSettlement = transfers.reduce((sum, t) => sum + t.amount, 0)
 
       // Category breakdown
       const categoryTotals: Record<string, number> = {}
@@ -121,7 +101,31 @@ function TripDashboard() {
         }))
         .sort((a, b) => b.total - a.total)
 
-      return { totalExpense, perCapitaExpense, pendingSettlement, transfers, categories }
+      // Calculate spending for each member (how much they actually consumed/owed)
+      const memberSpending = members.map(m => {
+        const parts = (participants as any[]).filter(p => p.member_id === m.id)
+        const total = parts.reduce((sum, p) => sum + Number(p.calculated_amount), 0)
+
+        const catBreakdown: Record<string, number> = {}
+        parts.forEach(p => {
+          const expense = expenses.find(e => e.id === p.expense_id)
+          const cat = expense ? expense.category : 'other'
+          catBreakdown[cat] = (catBreakdown[cat] || 0) + Number(p.calculated_amount)
+        })
+
+        const topCategories = Object.entries(catBreakdown)
+          .map(([cat, amt]) => ({ category: cat, amount: amt }))
+          .sort((a, b) => b.amount - a.amount)
+
+        return {
+          memberId: m.id,
+          displayName: m.display_name,
+          total,
+          topCategories
+        }
+      }).sort((a, b) => b.total - a.total)
+
+      return { totalExpense, perCapitaExpense, categories, memberSpending }
     },
     enabled: !!currentTrip,
   })
@@ -176,7 +180,7 @@ function TripDashboard() {
         </header>
 
         {/* 全新设计的总览大卡片 */}
-        <motion.div 
+        <motion.div
           className="glass-card p-6 sm:p-10 rounded-[32px] sm:rounded-[40px] border border-white/10 shadow-2xl relative overflow-hidden"
         >
           {/* 大数据头部：总计与人均 */}
@@ -191,7 +195,7 @@ function TripDashboard() {
                 <span className="text-sm font-bold text-text-sub uppercase tracking-widest">{currentTrip.currency}</span>
               </div>
             </div>
-            
+
             <div className="md:text-right space-y-3 p-5 md:p-0 bg-white/5 md:bg-transparent rounded-2xl md:rounded-none border border-white/5 md:border-none">
               <span className="text-xs font-bold text-text-sub uppercase tracking-[0.2em] flex items-center md:justify-end gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#FFB800]" />
@@ -235,32 +239,42 @@ function TripDashboard() {
           )}
         </motion.div>
 
-        {/* 核心需求：直观展示谁该付给谁多少钱 */}
-        {dashboardData && dashboardData.transfers.length > 0 && (
+        {/* 成员个人消费榜单 */}
+        {dashboardData && dashboardData.memberSpending.length > 0 && (
           <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white tracking-tight">平摊结算方案</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="text-xl font-bold text-white tracking-tight">成员总花费排行</h2>
+              <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest bg-white/5 px-2 py-1 rounded-md">
+                包含个人消费
+              </span>
             </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {dashboardData.transfers.map((t, i) => (
-                <div key={i} className="glass-card p-5 sm:p-6 rounded-[28px] flex flex-col sm:flex-row items-center justify-between gap-4 border-white/5 hover:border-white/10 transition-colors">
-                  <div className="flex-1 text-center sm:text-left flex flex-col gap-1">
-                    <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">付款方</span>
-                    <span className="text-white font-bold text-lg">{t.fromDisplayName}</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1 px-4">
-                    <span className="text-xl sm:text-2xl font-mono font-black text-[#0A84FF]">
-                      {(t.amount / 100).toFixed(2)}
-                    </span>
-                    <div className="flex items-center text-[#0A84FF]/60 text-[10px] font-bold uppercase tracking-widest">
-                      <span>支付给</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              {dashboardData.memberSpending.map((ms) => (
+                <div key={ms.memberId} className="glass-card p-6 rounded-[32px] border-white/5 hover:border-white/10 transition-colors flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-bold text-2xl">{ms.displayName}</span>
+                    <div className="text-right">
+                      <span className="text-3xl font-mono font-black text-emerald-400 tabular-nums">
+                        {(ms.total / 100).toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-emerald-400/60 font-bold uppercase ml-1 tracking-widest">
+                        {currentTrip?.currency}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex-1 text-center sm:text-right flex flex-col gap-1">
-                    <span className="text-[10px] font-bold text-text-sub uppercase tracking-widest">收款方</span>
-                    <span className="text-white font-bold text-lg">{t.toDisplayName}</span>
-                  </div>
+
+                  {ms.topCategories.length > 0 && (
+                    <div className="pt-4 border-t border-white/5 flex flex-wrap gap-2">
+                      {ms.topCategories.map((tc, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
+                          <span className="text-white/40">{getCategoryIcon(tc.category)}</span>
+                          <span className="text-xs font-bold text-white/80">{categoryLabels[tc.category] || tc.category}</span>
+                          <span className="text-xs font-mono font-bold text-white/60 ml-1">{(tc.amount / 100).toFixed(0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

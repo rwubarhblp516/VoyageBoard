@@ -56,11 +56,11 @@ export default function MainLayout() {
       </motion.button>
 
       {/* 极简高级底部导航 (Dock Style) */}
-      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-6">
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-[420px] px-6">
         <motion.div 
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="glass px-2 py-2 rounded-[32px] flex items-center justify-around border-white/5 shadow-[0_30px_100px_rgba(0,0,0,0.8)]"
+          className="bg-black/40 backdrop-blur-[40px] saturate-[200%] border border-white/10 px-2 py-2 rounded-[36px] flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         >
           {navItems.map((item) => {
             const Icon = item.icon
@@ -70,7 +70,7 @@ export default function MainLayout() {
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`relative flex flex-col items-center justify-center gap-1.5 flex-1 py-3 rounded-2xl transition-all duration-500 group ${
+                className={`relative flex flex-col items-center justify-center gap-1 w-16 h-16 rounded-[28px] transition-all duration-500 group z-10 ${
                   isActive 
                     ? 'text-white' 
                     : 'text-text-sub hover:text-white'
@@ -79,12 +79,13 @@ export default function MainLayout() {
                 {isActive && (
                   <motion.div 
                     layoutId="nav-bg"
-                    className="absolute inset-0 bg-white/10 rounded-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)]" 
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    className="absolute inset-0 bg-white/15 border border-white/10 rounded-[28px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]" 
+                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                    style={{ zIndex: -1 }}
                   />
                 )}
-                <Icon className={`h-5 w-5 relative z-10 transition-all duration-500 ${isActive ? 'scale-110 text-white drop-shadow-md' : 'text-text-sub group-hover:scale-110 group-hover:text-white'}`} />
-                <span className={`text-[10px] font-bold tracking-[0.2em] relative z-10 transition-all duration-500 mt-1 ${isActive ? 'text-white drop-shadow-md' : 'text-text-sub group-hover:text-white'}`}>
+                <Icon className={`h-6 w-6 transition-transform duration-500 ${isActive ? 'scale-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]' : 'group-hover:scale-110'}`} strokeWidth={isActive ? 2.5 : 2} />
+                <span className={`text-[9px] font-black tracking-widest uppercase transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
                   {item.label}
                 </span>
               </button>

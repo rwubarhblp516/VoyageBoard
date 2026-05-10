@@ -198,16 +198,16 @@ export default function ChecklistPage() {
                     </div>
                   )}
 
-                  {/* 确认标签 */}
+                  {/* 确认人标签 */}
                   {item.is_completed && item.completed_by && (
-                    <span className="shrink-0 text-[10px] font-bold bg-white/10 text-white/80 px-2.5 py-1 rounded-md uppercase tracking-widest border border-white/5">
-                      {item.completed_by.display_name} 已确认
+                    <span className="shrink-0 text-[10px] font-bold bg-emerald-400/15 text-emerald-400 px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-400/20 shadow-sm">
+                      {item.completed_by.display_name}
                     </span>
                   )}
                 </div>
 
                 {/* Actions */}
-                <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="shrink-0 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   {editingId !== item.id && (
                     <button
                       onClick={() => startEdit(item)}

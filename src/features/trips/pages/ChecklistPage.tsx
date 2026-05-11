@@ -12,6 +12,7 @@ export default function ChecklistPage() {
   const queryClient = useQueryClient()
   
   const [newItemTitle, setNewItemTitle] = useState('')
+  const [activeCategory, setActiveCategory] = useState<'public' | 'personal'>('public')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
 
@@ -33,19 +34,25 @@ export default function ChecklistPage() {
 
   // 获取清单列表
   const { data: checklists, isLoading } = useQuery({
-    queryKey: ['checklists', currentTrip?.id],
+    queryKey: ['checklists', currentTrip?.id, activeCategory, currentMember?.id],
     queryFn: async () => {
       if (!currentTrip) return []
-      const { data, error } = await supabase
+      let query = supabase
         .from('trip_checklists')
         .select('*, completed_by:trip_members(display_name)')
         .eq('trip_id', currentTrip.id)
-        .order('created_at', { ascending: false })
+        .eq('category', activeCategory)
+      
+      if (activeCategory === 'personal' && currentMember) {
+        query = query.eq('created_by_member_id', currentMember.id)
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
       
       if (error) throw error
       return data as any[]
     },
-    enabled: !!currentTrip
+    enabled: !!currentTrip && (activeCategory === 'public' || !!currentMember)
   })
 
   // 添加新清单
@@ -55,14 +62,16 @@ export default function ChecklistPage() {
     
     const { error } = await supabase.from('trip_checklists').insert({
       trip_id: currentTrip.id,
-      title: newItemTitle.trim()
+      title: newItemTitle.trim(),
+      category: activeCategory,
+      created_by_member_id: currentMember?.id
     })
     
     if (error) {
       alert(error.message)
     } else {
       setNewItemTitle('')
-      queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip.id] })
+      queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip.id, activeCategory] })
     }
   }
 
@@ -79,7 +88,7 @@ export default function ChecklistPage() {
     }).eq('id', item.id)
 
     if (error) alert(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id] })
+    else queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
   }
 
   // 删除清单
@@ -87,7 +96,7 @@ export default function ChecklistPage() {
     if (!window.confirm('确认删除此项吗？')) return
     const { error } = await supabase.from('trip_checklists').delete().eq('id', id)
     if (error) alert(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id] })
+    else queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
   }
 
   // 启动编辑
@@ -109,7 +118,7 @@ export default function ChecklistPage() {
     if (error) alert(error.message)
     else {
       setEditingId(null)
-      queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id] })
+      queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
     }
   }
 
@@ -123,6 +132,38 @@ export default function ChecklistPage() {
         <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">行前清单</h1>
         <p className="text-white/80 font-medium mt-2 drop-shadow-sm">打点好一切，开启无忧旅程。</p>
       </header>
+
+      {/* 分类切换器 */}
+      <div className="flex p-1.5 bg-black/20 backdrop-blur-md rounded-[20px] mb-8 w-fit border border-white/10 shadow-lg overflow-hidden relative">
+        <motion.div
+          className="absolute inset-y-1.5 bg-white rounded-[14px] shadow-xl"
+          initial={false}
+          animate={{
+            x: activeCategory === 'public' ? 0 : '100%',
+            width: '50%'
+          }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          style={{ width: 'calc(50% - 6px)' }}
+        />
+        <button
+          onClick={() => setActiveCategory('public')}
+          className={`relative z-10 px-8 py-2.5 rounded-[14px] text-sm font-black transition-colors duration-500 flex items-center gap-2 ${
+            activeCategory === 'public' ? 'text-black' : 'text-white/50 hover:text-white'
+          }`}
+        >
+          <div className={`w-1.5 h-1.5 rounded-full ${activeCategory === 'public' ? 'bg-black' : 'bg-white/30'}`} />
+          公开清单
+        </button>
+        <button
+          onClick={() => setActiveCategory('personal')}
+          className={`relative z-10 px-8 py-2.5 rounded-[14px] text-sm font-black transition-colors duration-500 flex items-center gap-2 ${
+            activeCategory === 'personal' ? 'text-black' : 'text-white/50 hover:text-white'
+          }`}
+        >
+          <div className={`w-1.5 h-1.5 rounded-full ${activeCategory === 'personal' ? 'bg-black' : 'bg-white/30'}`} />
+          个人清单
+        </button>
+      </div>
 
       {/* 添加表单 */}
       <form onSubmit={handleAdd} className="mb-8 relative group">
@@ -232,8 +273,14 @@ export default function ChecklistPage() {
           <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner border border-white/5">
             <ListTodo className="w-8 h-8 text-white/60 drop-shadow-sm" />
           </div>
-          <h3 className="text-xl font-bold text-white drop-shadow-md mb-2">一切准备就绪？</h3>
-          <p className="text-white/80 font-medium text-sm drop-shadow-sm">开始添加你们的行前待办清单吧。</p>
+          <h3 className="text-xl font-bold text-white drop-shadow-md mb-2">
+            {activeCategory === 'public' ? '一切准备就绪？' : '准备好出发了？'}
+          </h3>
+          <p className="text-white/80 font-medium text-sm drop-shadow-sm">
+            {activeCategory === 'public' 
+              ? '开始添加你们的行前待办清单吧。' 
+              : '记录下你个人的准备事项，只有你自己能看到。'}
+          </p>
         </div>
       )}
     </div>

@@ -141,24 +141,30 @@ export type Database = {
       }
       trip_checklists: {
         Row: {
+          category: string | null
           completed_by_member_id: string | null
           created_at: string | null
+          created_by_member_id: string | null
           id: string
           is_completed: boolean | null
           title: string
           trip_id: string
         }
         Insert: {
+          category?: string | null
           completed_by_member_id?: string | null
           created_at?: string | null
+          created_by_member_id?: string | null
           id?: string
           is_completed?: boolean | null
           title: string
           trip_id: string
         }
         Update: {
+          category?: string | null
           completed_by_member_id?: string | null
           created_at?: string | null
+          created_by_member_id?: string | null
           id?: string
           is_completed?: boolean | null
           title?: string

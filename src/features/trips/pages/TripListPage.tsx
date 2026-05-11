@@ -100,81 +100,71 @@ export default function TripListPage() {
                   whileTap={{ scale: 0.98 }}
                   className="group relative cursor-pointer"
                 >
-                  <div className={`relative overflow-hidden glass-card rounded-[48px] h-80 transition-all duration-700 border-white/10 shadow-2xl ${
-                    hoveredId === trip.id ? 'border-white/20 -translate-y-2 shadow-[0_40px_80px_rgba(0,0,0,0.5)] bg-white/[0.08]' : 'bg-white/[0.04]'
+                  <div className={`relative overflow-hidden glass-card rounded-[40px] h-80 transition-all duration-700 border-white/10 shadow-2xl ${
+                    hoveredId === trip.id ? 'border-white/20 -translate-y-2 shadow-[0_40px_80px_rgba(0,0,0,0.5)] bg-white/10' : 'bg-white/5'
                   }`}>
-                    {/* Background Texture/Image Overlay */}
-                    <div className="absolute inset-0 z-0 opacity-40">
+                    {/* 背景图层 */}
+                    <div className="absolute inset-0 z-0">
                       {trip.cover_url ? (
                         <img 
                           src={trip.cover_url} 
                           alt="" 
-                          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110 blur-[1px]"
+                          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 opacity-50"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-white/10 via-transparent to-black/20" />
+                        <div className="w-full h-full bg-gradient-to-br from-white/5 via-white/[0.02] to-transparent" />
                       )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                     </div>
-                    <div className="absolute inset-0 z-0 bg-gradient-to-b from-transparent via-black/20 to-black/60" />
 
-                    {/* Top Section: Date & Edit */}
-                    <div className="relative z-10 p-8 pb-0 flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                          <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
-                          {trip.start_date && trip.end_date ? `${formatDate(trip.start_date)} - ${formatDate(trip.end_date)}` : 'SCHEDULE PENDING'}
+                    {/* 卡片内容 */}
+                    <div className="relative z-10 h-full p-8 flex flex-col">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="space-y-1">
+                          <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 w-fit mb-2">
+                            <span className="text-[10px] font-bold text-white/90 tracking-wider">
+                              {trip.start_date && trip.end_date ? `${formatDate(trip.start_date)} - ${formatDate(trip.end_date)}` : '未设定日期'}
+                            </span>
+                          </div>
+                          <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
+                            {trip.title}
+                          </h3>
+                          <div className="flex items-center gap-2 text-white/60 font-bold text-[10px] uppercase tracking-widest mt-1">
+                            <span>{trip.destination}</span>
+                            <div className="w-1 h-1 rounded-full bg-white/20" />
+                            <span>{trip.memberCount} 位成员</span>
+                          </div>
                         </div>
-                        <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
-                          {trip.title}
-                        </h3>
-                        <p className="text-white/60 font-bold text-[10px] uppercase tracking-[0.3em]">
-                          {trip.destination}
-                        </p>
+
+                        <button
+                          onClick={(e) => handleEditTrip(e, trip)}
+                          className="p-3 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl text-white/40 hover:text-white hover:bg-white/20 transition-all active:scale-90"
+                          title="修改旅程"
+                        >
+                          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                          </svg>
+                        </button>
                       </div>
 
-                      <button
-                        onClick={(e) => handleEditTrip(e, trip)}
-                        className="p-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white/20 hover:text-white hover:bg-white/10 transition-all active:scale-90"
-                      >
-                        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Bottom Section: Stats & Action */}
-                    <div className="relative z-10 p-8 pt-0 mt-auto">
-                      <div className="flex items-end justify-between mb-6">
-                        <div className="flex -space-x-2">
-                          {[...Array(Math.min(trip.memberCount, 3))].map((_, i) => (
-                            <div key={i} className="w-8 h-8 rounded-full border-2 border-black/20 bg-white/10 backdrop-blur-md flex items-center justify-center">
-                              <span className="text-[10px] font-black text-white/40">{i + 1}</span>
-                            </div>
-                          ))}
-                          {trip.memberCount > 3 && (
-                            <div className="w-8 h-8 rounded-full border-2 border-black/20 bg-white/10 backdrop-blur-md flex items-center justify-center">
-                              <span className="text-[10px] font-black text-white/40">+{trip.memberCount - 3}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="text-right">
-                          <p className="text-white/30 text-[9px] font-bold uppercase tracking-[0.2em] mb-1">Estimated Spending</p>
-                          <div className="flex items-baseline gap-1.5 justify-end">
-                            <span className="text-3xl font-black text-white tracking-tighter tabular-nums drop-shadow-sm">
+                      <div className="mt-auto space-y-6">
+                        <div className="flex flex-col items-end">
+                          <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-1">总支出预估</span>
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-4xl font-black text-white tracking-tighter tabular-nums">
                               {((trip.totalExpense || 0) / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
                             </span>
-                            <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                            <span className="text-[10px] font-bold text-white/40 uppercase">
                               {trip.currency}
                             </span>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="group/btn flex items-center justify-between py-4 px-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] hover:bg-white/10 transition-all duration-500 overflow-hidden relative">
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
-                        <span className="text-[10px] font-black text-white/90 uppercase tracking-[0.4em] relative z-10">Depart Now</span>
-                        <ChevronRight className="h-4 w-4 text-white/40 group-hover/btn:text-white group-hover/btn:translate-x-1 transition-all relative z-10" />
+                        <div className="group/btn relative h-14 w-full bg-white/10 hover:bg-white/15 backdrop-blur-xl border border-white/10 rounded-[20px] flex items-center justify-center transition-all duration-500 overflow-hidden shadow-xl">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
+                          <span className="text-xs font-black text-white uppercase tracking-[0.5em] ml-2">进入旅程</span>
+                          <ChevronRight className="h-4 w-4 text-white/40 group-hover/btn:text-white group-hover/btn:translate-x-1 transition-all ml-1" />
+                        </div>
                       </div>
                     </div>
                   </div>

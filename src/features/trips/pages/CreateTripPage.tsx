@@ -55,6 +55,7 @@ export default function CreateTripPage({ isEditing = false }: CreateTripPageProp
   useEffect(() => {
     if (isEditing && tripId) {
       async function fetchTrip() {
+        if (!tripId) return
         const { data, error } = await supabase
           .from('trips')
           .select('*')
@@ -68,7 +69,7 @@ export default function CreateTripPage({ isEditing = false }: CreateTripPageProp
             currency: data.currency || 'CNY',
             start_date: data.start_date,
             end_date: data.end_date,
-            cover_url: data.cover_url || '',
+            cover_url: (data as any).cover_url || '',
           })
         }
         setIsLoadingTrip(false)
@@ -86,7 +87,7 @@ export default function CreateTripPage({ isEditing = false }: CreateTripPageProp
           .from('trips')
           .update({
             ...data,
-          })
+          } as any)
           .eq('id', tripId)
         
         if (error) throw error
@@ -97,7 +98,7 @@ export default function CreateTripPage({ isEditing = false }: CreateTripPageProp
           .insert({
             ...data,
             owner_id: user.id,
-          })
+          } as any)
           .select()
           .single()
 

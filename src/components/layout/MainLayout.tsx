@@ -78,7 +78,7 @@ export default function MainLayout() {
 
             if (isCenter) {
               return (
-                <div key={item.id} className="relative flex-1 flex justify-center -mt-8">
+                <div key={item.id} className="relative flex-1 flex flex-col items-center justify-center">
                   <motion.button
                     onClick={() => {
                       if (isActive) {
@@ -87,22 +87,34 @@ export default function MainLayout() {
                         navigate(item.id)
                       }
                     }}
-                    whileHover={{ scale: 1.1, y: -4 }}
+                    animate={{
+                      y: isActive ? -28 : 0,
+                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                    whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    className={`w-16 h-16 rounded-full flex items-center justify-center shadow-[0_15px_35px_rgba(0,0,0,0.5)] transition-all duration-500 border-4 border-black/40 ${isActive 
-                      ? 'bg-white text-black' 
-                      : 'bg-[#1a1a1a] text-white/60 hover:text-white'
+                    className={`flex items-center justify-center transition-all duration-500 z-20 ${isActive 
+                      ? 'w-16 h-16 rounded-full bg-white text-black shadow-[0_15px_35px_rgba(0,0,0,0.5)] border-4 border-black/60' 
+                      : 'w-12 h-12 rounded-[24px] text-white/40 hover:text-white/80'
                     }`}
                   >
                     {isActive ? (
                       <Plus className="h-7 w-7" strokeWidth={3} />
                     ) : (
-                      <Icon className="h-6 w-6" strokeWidth={2.5} />
+                      <Icon className={`h-5 w-5 ${isActive ? 'scale-110' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
                     )}
                   </motion.button>
-                  {isActive && (
-                    <span className="absolute top-18 text-[10px] font-black text-white/80 uppercase tracking-[0.2em] drop-shadow-md">
-                      记一笔
+                  
+                  <span className={`absolute transition-all duration-500 text-[10px] font-bold uppercase tracking-widest ${isActive 
+                    ? 'top-14 opacity-100 text-white/80' 
+                    : 'top-10 opacity-0'
+                  }`}>
+                    记一笔
+                  </span>
+
+                  {!isActive && (
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-white/40 mt-1.5">
+                      {item.label}
                     </span>
                   )}
                 </div>

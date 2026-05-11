@@ -150,7 +150,7 @@ function TripDashboard() {
     return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   }
 
-  const dateRange = currentTrip.start_date && currentTrip.end_date 
+  const dateRange = currentTrip.start_date && currentTrip.end_date
     ? `${formatDate(currentTrip.start_date)} - ${formatDate(currentTrip.end_date)}`
     : ''
 
@@ -192,7 +192,7 @@ function TripDashboard() {
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight drop-shadow-md">
             {currentTrip.title}
           </h1>
-          
+
           <div className="flex items-center gap-3 mt-4 px-4 py-1.5 bg-white/5 backdrop-blur-md rounded-full border border-white/5">
             <span className="text-[10px] font-black text-white/90 uppercase tracking-widest">{dateRange}</span>
           </div>

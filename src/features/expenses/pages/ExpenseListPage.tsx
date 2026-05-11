@@ -78,7 +78,7 @@ export default function ExpenseListPage() {
         <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">记账账单</h1>
         <p className="text-white/80 font-medium drop-shadow-sm mb-8">清楚记录，享受每一次探索。</p>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-2xl">
+        <div className="flex items-center gap-4 w-full max-w-2xl">
           {/* Search Bar */}
           <div className="relative flex-1 w-full">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -92,19 +92,24 @@ export default function ExpenseListPage() {
               className="w-full bg-black/20 backdrop-blur-md border border-white/10 rounded-2xl pl-11 pr-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all font-medium shadow-inner placeholder:text-white/50"
             />
           </div>
-
-          <button
-            onClick={() => {
-              setEditingExpense(null)
-              setShowAddForm(true)
-            }}
-            className="group relative px-8 py-3.5 bg-white text-black rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden shadow-xl shrink-0 active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">记一笔</span>
-          </button>
         </div>
       </header>
+
+      {/* Floating Add Button */}
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+        <motion.button
+          onClick={() => {
+            setEditingExpense(null)
+            setShowAddForm(true)
+          }}
+          whileHover={{ scale: 1.1, boxShadow: "0 20px 40px rgba(255,255,255,0.15)" }}
+          whileTap={{ scale: 0.9 }}
+          className="w-14 h-14 bg-white text-slate-950 rounded-full flex items-center justify-center shadow-[0_15px_40px_rgba(0,0,0,0.5)] group overflow-hidden relative"
+        >
+          <div className="absolute inset-0 bg-gradient-to-tr from-white via-slate-100 to-white opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <Plus className="h-6 w-6 relative z-10" />
+        </motion.button>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">

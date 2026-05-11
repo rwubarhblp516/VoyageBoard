@@ -84,13 +84,25 @@ function TripDashboard() {
 
       if (!members || !expenses || !participants) return { totalExpense: 0, perCapitaExpense: 0, categories: [], memberSpending: [] }
 
-      const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+      const participantsByExpense = (participants as any[]).reduce<Record<string, any[]>>((acc, participant) => {
+        const expenseId = participant.expense_id
+        acc[expenseId] = acc[expenseId] || []
+        acc[expenseId].push(participant)
+        return acc
+      }, {})
+
+      const sharedExpenses = expenses.filter(expense => {
+        const expenseParticipants = participantsByExpense[expense.id] || []
+        return !(expenseParticipants.length === 1 && expenseParticipants[0].member_id === expense.payer_member_id)
+      })
+
+      const totalExpense = sharedExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
       const memberCount = members.length || 1
       const perCapitaExpense = totalExpense / memberCount
 
       // Category breakdown
       const categoryTotals: Record<string, number> = {}
-      expenses.forEach(e => {
+      sharedExpenses.forEach(e => {
         categoryTotals[e.category] = (categoryTotals[e.category] || 0) + Number(e.amount)
       })
 

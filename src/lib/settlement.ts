@@ -18,6 +18,7 @@ export interface Transfer {
 export function calculateTransfers(balances: MemberBalance[]): Transfer[] {
   const creditors = balances
     .filter(x => x.balance > 0)
+    .map(x => ({ ...x }))
     .sort((a, b) => b.balance - a.balance)
 
   const debtors = balances

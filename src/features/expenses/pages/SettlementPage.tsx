@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { calculateTransfers, MemberBalance } from '@/lib/settlement'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
 import FadeContent from '@/components/FadeContent'
 
 export default function SettlementPage() {
@@ -134,6 +134,35 @@ export default function SettlementPage() {
                               {Math.abs(b.balance / 100).toFixed(2)}
                             </p>
                             <p className="text-xs text-rose-400/60 font-bold uppercase ml-1">{currentTrip?.currency}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* 精确转账方案 */}
+                {settlementData.transfers.length > 0 && (
+                  <section>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                      <span className="w-1.5 h-6 bg-sky-400 rounded-full"></span>
+                      谁该给谁
+                    </h2>
+                    <div className="grid grid-cols-1 gap-4">
+                      {settlementData.transfers.map((transfer, index) => (
+                        <div key={`${transfer.fromMemberId}-${transfer.toMemberId}-${index}`} className="bg-white/5 border border-sky-400/20 p-5 sm:p-6 rounded-[24px]">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <p className="text-white font-bold text-lg sm:text-xl truncate">{transfer.fromDisplayName}</p>
+                              <ArrowRight className="w-5 h-5 text-sky-300 shrink-0" />
+                              <p className="text-white font-bold text-lg sm:text-xl truncate">{transfer.toDisplayName}</p>
+                            </div>
+                            <div className="text-right flex items-baseline gap-1 shrink-0">
+                              <p className="text-2xl sm:text-3xl font-mono font-black tracking-tighter text-sky-300">
+                                {(transfer.amount / 100).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-sky-300/60 font-bold uppercase ml-1">{currentTrip?.currency}</p>
+                            </div>
                           </div>
                         </div>
                       ))}

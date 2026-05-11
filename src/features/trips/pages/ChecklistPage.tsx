@@ -52,7 +52,8 @@ export default function ChecklistPage() {
       if (error) throw error
       return data as any[]
     },
-    enabled: !!currentTrip && (activeCategory === 'public' || !!currentMember)
+    enabled: !!currentTrip && (activeCategory === 'public' || !!currentMember),
+    retry: false
   })
 
   // 添加新清单
@@ -124,17 +125,18 @@ export default function ChecklistPage() {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <header className="mb-10">
+      <header className="mb-10 flex flex-col items-center text-center">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
           <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">CHECKLIST</span>
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
         </div>
         <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">行前清单</h1>
         <p className="text-white/80 font-medium mt-2 drop-shadow-sm">打点好一切，开启无忧旅程。</p>
       </header>
 
       {/* 分类切换器 */}
-      <div className="flex p-1.5 bg-black/20 backdrop-blur-md rounded-[20px] mb-8 w-fit border border-white/10 shadow-lg overflow-hidden relative">
+      <div className="flex p-1.5 bg-black/20 backdrop-blur-md rounded-[20px] mb-8 w-fit mx-auto border border-white/10 shadow-lg overflow-hidden relative">
         <motion.div
           className="absolute inset-y-1.5 bg-white rounded-[14px] shadow-xl"
           initial={false}

@@ -131,6 +131,29 @@ function TripDashboard() {
     enabled: !!currentTrip,
   })
 
+  const { data: memberCount } = useQuery({
+    queryKey: ['memberCount', currentTrip.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('trip_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('trip_id', currentTrip.id)
+      if (error) throw error
+      return count || 0
+    },
+    enabled: !!currentTrip,
+  })
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+  }
+
+  const dateRange = currentTrip.start_date && currentTrip.end_date 
+    ? `${formatDate(currentTrip.start_date)} - ${formatDate(currentTrip.end_date)}`
+    : ''
+
   const totalExpenseDisplay = dashboardData ? (dashboardData.totalExpense / 100).toFixed(2) : '0.00'
   const perCapitaExpenseDisplay = dashboardData ? (dashboardData.perCapitaExpense / 100).toFixed(2) : '0.00'
 
@@ -162,18 +185,27 @@ function TripDashboard() {
       <div className="space-y-12">
         <header className="mb-12 flex flex-col items-center text-center">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-[2px] bg-[#0A84FF] rounded-full shadow-sm" />
+            <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
             <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">Current Voyage</span>
-            <div className="w-8 h-[2px] bg-[#0A84FF] rounded-full shadow-sm" />
+            <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
           </div>
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight drop-shadow-md">
             {currentTrip.title}
           </h1>
-          <div className="flex items-center gap-4 text-white/70 font-bold tracking-[0.2em] text-[10px] uppercase mt-3">
+          
+          <div className="flex items-center gap-3 mt-4 px-4 py-1.5 bg-white/5 backdrop-blur-md rounded-full border border-white/5">
+            <span className="text-[10px] font-black text-white/90 uppercase tracking-widest">{dateRange}</span>
+          </div>
+
+          <div className="flex items-center gap-4 text-white/60 font-bold tracking-[0.2em] text-[10px] uppercase mt-6">
             <span className="flex items-center gap-2">
               {currentTrip.destination}
             </span>
-            <div className="w-1 h-1 rounded-full bg-white/20" />
+            <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
+            <span className="flex items-center gap-2">
+              {memberCount} 位成员
+            </span>
+            <div className="w-1.5 h-1.5 rounded-full bg-white/10" />
             <span className="flex items-center gap-2">
               {currentTrip.currency}
             </span>

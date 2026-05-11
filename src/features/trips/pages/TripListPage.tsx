@@ -22,11 +22,14 @@ export default function TripListPage() {
       setLoading(true)
       const { data, error } = await supabase
         .from('trips')
-        .select('*')
+        .select('*, trip_members(count)')
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        setTrips(data)
+        setTrips(data.map((t: any) => ({
+          ...t,
+          memberCount: t.trip_members[0]?.count || 0
+        })))
       }
       setLoading(false)
     }
@@ -37,6 +40,12 @@ export default function TripListPage() {
   const handleSelectTrip = (trip: Trip) => {
     setCurrentTrip(trip)
     navigate('/')
+  }
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   }
 
   return (
@@ -76,7 +85,7 @@ export default function TripListPage() {
             </div>
           ) : trips.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {trips.map((trip) => (
+              {trips.map((trip: any) => (
                 <motion.div
                   key={trip.id}
                   onClick={() => handleSelectTrip(trip)}
@@ -89,7 +98,12 @@ export default function TripListPage() {
                     hoveredId === trip.id ? 'border-white/10 bg-white/5 -translate-y-2 shadow-[0_30px_60px_rgba(0,0,0,0.6)]' : ''
                   }`}>
                     <div className="flex justify-between items-start mb-10">
-                      <span className="text-[10px] font-black text-text-sub uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                      <div className="px-3 py-1 bg-white/5 rounded-full border border-white/5">
+                        <span className="text-[10px] font-black text-white/90 uppercase tracking-[0.2em]">
+                          {trip.start_date && trip.end_date ? `${formatDate(trip.start_date)} - ${formatDate(trip.end_date)}` : '未设定日期'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black text-text-sub uppercase tracking-widest">
                         {trip.currency}
                       </span>
                     </div>
@@ -97,13 +111,19 @@ export default function TripListPage() {
                     <h3 className="text-2xl font-black text-white mb-2 tracking-tight group-hover:text-white transition-colors">
                       {trip.title}
                     </h3>
-                    <p className="text-text-sub font-medium text-sm">
-                      {trip.destination}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-text-sub font-medium text-sm">
+                        {trip.destination}
+                      </p>
+                      <div className="w-1 h-1 rounded-full bg-white/10" />
+                      <p className="text-text-sub font-bold text-[10px] uppercase tracking-widest">
+                        {trip.memberCount} MEMBERS
+                      </p>
+                    </div>
                     
                     <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <span className="text-[10px] font-black text-text-sub uppercase tracking-[0.2em]">Open</span>
-                      <ChevronRight className="h-4 w-4 text-white/20" />
+                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">进入旅程</span>
+                      <ChevronRight className="h-4 w-4 text-emerald-400/40" />
                     </div>
                   </div>
                 </motion.div>

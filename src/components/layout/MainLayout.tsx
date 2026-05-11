@@ -89,19 +89,22 @@ export default function MainLayout() {
                     }}
                     animate={{
                       y: isActive ? -28 : 0,
+                      backgroundColor: isActive ? "rgba(255, 255, 255, 1)" : "rgba(255, 255, 255, 0)",
+                      borderRadius: isActive ? "9999px" : "24px",
+                      color: isActive ? "rgba(0, 0, 0, 1)" : "rgba(255, 255, 255, 0.4)",
                     }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 35, mass: 0.5 }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`flex items-center justify-center transition-all duration-200 z-20 ${isActive 
-                      ? 'w-16 h-16 rounded-full bg-white text-black shadow-[0_15px_35px_rgba(0,0,0,0.5)] border-4 border-black/60' 
-                      : 'w-12 h-12 rounded-[24px] text-white/40 hover:text-white/80'
+                    className={`flex items-center justify-center z-20 ${isActive 
+                      ? 'w-16 h-16 shadow-[0_15px_35px_rgba(0,0,0,0.5)] border-4 border-black/60' 
+                      : 'w-12 h-12 border-0'
                     }`}
                   >
                     {isActive ? (
                       <Plus className="h-7 w-7" strokeWidth={3} />
                     ) : (
-                      <Icon className={`h-5 w-5 ${isActive ? 'scale-110' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
+                      <Icon className="h-5 w-5" strokeWidth={2} />
                     )}
                   </motion.button>
                   

@@ -160,21 +160,21 @@ function TripDashboard() {
   return (
     <FadeContent blur={true} duration={800}>
       <div className="space-y-12">
-        <header className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-[2px] bg-[#0A84FF] rounded-full" />
-            <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em]">Current Voyage</span>
+        <header className="mb-12 flex flex-col items-center text-center">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-[2px] bg-[#0A84FF] rounded-full shadow-sm" />
+            <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">Current Voyage</span>
+            <div className="w-8 h-[2px] bg-[#0A84FF] rounded-full shadow-sm" />
           </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight drop-shadow-md">
             {currentTrip.title}
           </h1>
-          <div className="flex items-center gap-4 text-white/80 font-bold tracking-widest text-[10px] uppercase">
+          <div className="flex items-center gap-4 text-white/70 font-bold tracking-[0.2em] text-[10px] uppercase mt-3">
             <span className="flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-white/40" />
               {currentTrip.destination}
             </span>
+            <div className="w-1 h-1 rounded-full bg-white/20" />
             <span className="flex items-center gap-2">
-              <div className="w-1 h-1 rounded-full bg-white/40" />
               {currentTrip.currency}
             </span>
           </div>
@@ -292,8 +292,16 @@ const Settings = () => {
   const navigate = useNavigate()
 
   return (
-    <div className="py-8">
-      <h1 className="text-3xl font-bold text-text-primary">系统设置</h1>
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+      <header className="mb-10 flex flex-col items-center text-center">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+          <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">SETTINGS</span>
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">系统设置</h1>
+        <p className="text-white/80 font-medium mt-2 drop-shadow-sm">管理您的偏好与账号安全。</p>
+      </header>
       <div className="mt-8 space-y-4">
         <button
           onClick={() => {

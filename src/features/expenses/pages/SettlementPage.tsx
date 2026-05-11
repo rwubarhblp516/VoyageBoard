@@ -58,9 +58,14 @@ export default function SettlementPage() {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      <header className="mb-10">
-        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">结算</h1>
-        <p className="text-white/90 font-medium mt-2 drop-shadow-sm">清晰的收支明细，群内发红包即可。</p>
+      <header className="mb-12 flex flex-col items-center text-center">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+          <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">SETTLEMENT</span>
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">费用结算</h1>
+        <p className="text-white/80 font-medium mt-2 drop-shadow-sm">清晰的收支明细，群内发红包即可。</p>
       </header>
 
       {isLoading ? (

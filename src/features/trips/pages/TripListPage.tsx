@@ -56,10 +56,16 @@ export default function TripListPage() {
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-20 md:py-32">
         <FadeContent blur={true} duration={800}>
           {/* 极致简约 Header */}
-          <header className="mb-24">
-            <h1 className="text-5xl font-black text-white tracking-tighter">
+          <header className="mb-24 flex flex-col items-center text-center">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+              <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">EXPLORE</span>
+              <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+            </div>
+            <h1 className="text-5xl font-black text-white tracking-tighter drop-shadow-md">
               我的旅程
             </h1>
+            <p className="text-white/80 font-medium mt-2 drop-shadow-sm">开启您的下一段精彩冒险。</p>
           </header>
 
           {loading ? (

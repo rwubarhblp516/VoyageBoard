@@ -69,38 +69,40 @@ export default function ExpenseListPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       
-      <header className="flex flex-col mb-10 gap-6">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-          <div>
-            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">记账账单</h1>
-            <p className="text-text-sub font-medium">清楚记录，享受每一次探索。</p>
+      <header className="mb-12 flex flex-col items-center text-center">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+          <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">EXPENSES</span>
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">记账账单</h1>
+        <p className="text-white/80 font-medium drop-shadow-sm mb-8">清楚记录，享受每一次探索。</p>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-2xl">
+          {/* Search Bar */}
+          <div className="relative flex-1 w-full">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-white/30" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜索账单标题或分类..."
+              className="w-full bg-black/20 backdrop-blur-md border border-white/10 rounded-2xl pl-11 pr-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all font-medium shadow-inner placeholder:text-white/50"
+            />
           </div>
-          
+
           <button
             onClick={() => {
               setEditingExpense(null)
               setShowAddForm(true)
             }}
-            className="group relative px-6 py-3 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl text-white transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden shadow-xl shrink-0"
+            className="group relative px-8 py-3.5 bg-white text-black rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden shadow-xl shrink-0 active:scale-95"
           >
-            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            <Plus className="w-4 h-4 relative z-10" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] relative z-10">记一笔</span>
+            <Plus className="w-4 h-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">记一笔</span>
           </button>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-white/30" />
-          </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索账单标题或分类..."
-            className="w-full bg-white/5 border border-white/10 rounded-2xl pl-11 pr-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all font-medium shadow-inner placeholder:text-white/50"
-          />
         </div>
       </header>
 

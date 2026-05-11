@@ -79,24 +79,28 @@ export default function MembersPage() {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="flex items-end justify-between mb-12 gap-4">
-        <div>
-          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">成员管理</h1>
-          <p className="text-white/80 font-medium drop-shadow-sm">谁在和你一起探索世界？</p>
+      <header className="mb-12 flex flex-col items-center text-center">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+          <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">MEMBERS</span>
+          <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
         </div>
+        <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">成员管理</h1>
+        <p className="text-white/80 font-medium drop-shadow-sm mb-8">谁在和你一起探索世界？</p>
+        
         <button
           onClick={handleGenerateInviteLink}
-          className="group relative px-6 py-3 bg-black/20 backdrop-blur-md border border-white/20 rounded-2xl text-white transition-all duration-300 flex items-center gap-2 overflow-hidden shadow-lg hover:bg-black/30 hover:border-white/30 active:scale-95"
+          className="group relative px-8 py-3.5 bg-white text-black rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden shadow-xl active:scale-95"
         >
           {copied ? (
             <>
-              <CheckCheck className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-400">已复制</span>
+              <CheckCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">已复制</span>
             </>
           ) : (
             <>
               <Link2 className="w-4 h-4" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">邀请伙伴</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">邀请伙伴</span>
             </>
           )}
         </button>

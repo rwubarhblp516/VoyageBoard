@@ -105,6 +105,16 @@ export default function CreateTripPage() {
           <span className="text-[9px] font-bold uppercase tracking-[0.2em] relative z-10">&lt; 返回</span>
         </button>
 
+        <header className="mb-12 flex flex-col items-center text-center">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+            <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">ADVENTURE</span>
+            <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">开启新旅程</h1>
+          <p className="text-white/80 font-medium drop-shadow-sm">规划您的下一段精彩冒险。</p>
+        </header>
+
         <FadeContent duration={600} blur={true}>
           <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-7 md:p-10 rounded-[40px] space-y-6">
             <div className="space-y-2.5">

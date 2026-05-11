@@ -6,6 +6,7 @@ export interface Trip {
   end_date: string
   currency: string | null
   owner_id: string
+  cover_url?: string | null
   created_at: string | null
 }
 

@@ -22,13 +22,14 @@ export default function TripListPage() {
       setLoading(true)
       const { data, error } = await supabase
         .from('trips')
-        .select('*, trip_members(count)')
+        .select('*, trip_members(count), expenses(amount)')
         .order('created_at', { ascending: false })
 
       if (!error && data) {
         setTrips(data.map((t: any) => ({
           ...t,
-          memberCount: t.trip_members[0]?.count || 0
+          memberCount: t.trip_members[0]?.count || 0,
+          totalExpense: t.expenses.reduce((sum: number, e: any) => sum + Number(e.amount), 0)
         })))
       }
       setLoading(false)
@@ -40,6 +41,11 @@ export default function TripListPage() {
   const handleSelectTrip = (trip: Trip) => {
     setCurrentTrip(trip)
     navigate('/')
+  }
+
+  const handleEditTrip = (e: React.MouseEvent, trip: Trip) => {
+    e.stopPropagation()
+    navigate(`/trips/edit/${trip.id}`)
   }
 
   const formatDate = (dateStr: string) => {
@@ -78,13 +84,13 @@ export default function TripListPage() {
           </header>
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="glass-card h-48 rounded-[32px] animate-pulse" />
+                <div key={i} className="glass-card h-64 rounded-[40px] animate-pulse" />
               ))}
             </div>
           ) : trips.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {trips.map((trip: any) => (
                 <motion.div
                   key={trip.id}
@@ -94,36 +100,81 @@ export default function TripListPage() {
                   whileTap={{ scale: 0.98 }}
                   className="group relative cursor-pointer"
                 >
-                  <div className={`glass-card p-8 rounded-[40px] h-full transition-all duration-500 border-white/5 ${
-                    hoveredId === trip.id ? 'border-white/10 bg-white/5 -translate-y-2 shadow-[0_30px_60px_rgba(0,0,0,0.6)]' : ''
+                  <div className={`relative overflow-hidden glass-card rounded-[44px] h-80 transition-all duration-700 border-white/5 shadow-xl ${
+                    hoveredId === trip.id ? 'border-white/20 -translate-y-2 shadow-[0_40px_80px_rgba(0,0,0,0.7)]' : ''
                   }`}>
-                    <div className="flex justify-between items-start mb-10">
-                      <div className="px-3 py-1 bg-white/5 rounded-full border border-white/5">
-                        <span className="text-[10px] font-black text-white/90 uppercase tracking-[0.2em]">
-                          {trip.start_date && trip.end_date ? `${formatDate(trip.start_date)} - ${formatDate(trip.end_date)}` : '未设定日期'}
-                        </span>
+                    {/* Background Image / Gradient */}
+                    <div className="absolute inset-0 z-0">
+                      {trip.cover_url ? (
+                        <img 
+                          src={trip.cover_url} 
+                          alt="" 
+                          className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-white/5 via-transparent to-black/40" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
+                    </div>
+
+                    {/* Content Overlay */}
+                    <div className="relative z-10 h-full p-8 flex flex-col justify-between">
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-2">
+                          <div className="px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 w-fit">
+                            <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">
+                              {trip.start_date && trip.end_date ? `${formatDate(trip.start_date)} - ${formatDate(trip.end_date)}` : '未设定日期'}
+                            </span>
+                          </div>
+                          <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
+                            {trip.title}
+                          </h3>
+                        </div>
+                        
+                        <button
+                          onClick={(e) => handleEditTrip(e, trip)}
+                          className="p-3 bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl text-white/60 hover:text-white hover:bg-white/20 transition-all shadow-lg active:scale-90"
+                        >
+                          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                          </svg>
+                        </button>
                       </div>
-                      <span className="text-[10px] font-black text-text-sub uppercase tracking-widest">
-                        {trip.currency}
-                      </span>
-                    </div>
-                    
-                    <h3 className="text-2xl font-black text-white mb-2 tracking-tight group-hover:text-white transition-colors">
-                      {trip.title}
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      <p className="text-text-sub font-medium text-sm">
-                        {trip.destination}
-                      </p>
-                      <div className="w-1 h-1 rounded-full bg-white/10" />
-                      <p className="text-text-sub font-bold text-[10px] uppercase tracking-widest">
-                        {trip.memberCount} MEMBERS
-                      </p>
-                    </div>
-                    
-                    <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">进入旅程</span>
-                      <ChevronRight className="h-4 w-4 text-emerald-400/40" />
+
+                      <div className="space-y-4">
+                        <div className="flex items-end justify-between">
+                          <div className="space-y-1">
+                            <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest">
+                              {trip.destination}
+                            </p>
+                            <div className="flex items-center gap-2 text-white/80 font-bold text-xs">
+                              <span className="flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                {trip.memberCount} 位成员
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="text-white/40 text-[9px] font-bold uppercase tracking-[0.2em] mb-1">总支出</p>
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-2xl font-black text-white tabular-nums">
+                                {(trip.totalExpense / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] font-bold text-white/40 uppercase">
+                                {trip.currency}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-5 border-t border-white/10 flex items-center justify-between group-hover:translate-x-1 transition-transform">
+                          <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.3em]">进入旅程</span>
+                          <ChevronRight className="h-4 w-4 text-emerald-400" />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

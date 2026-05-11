@@ -381,6 +381,13 @@ function App() {
                   </div>
                 </ProtectedRoute>
               } />
+              <Route path="/trips/edit/:tripId" element={
+                <ProtectedRoute>
+                  <div className="max-w-5xl mx-auto px-4">
+                    <CreateTripPage isEditing={true} />
+                  </div>
+                </ProtectedRoute>
+              } />
 
               <Route path="/" element={
                 <ProtectedRoute>

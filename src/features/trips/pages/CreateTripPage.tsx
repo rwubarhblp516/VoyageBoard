@@ -4,10 +4,10 @@ import * as z from 'zod'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useTripStore } from '@/stores/useTripStore'
-import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import FadeContent from '@/components/FadeContent'
 import LightPillar from '@/components/LightPillar'
 import AppleDatePicker from '@/components/AppleDatePicker'
@@ -20,20 +20,27 @@ const tripSchema = z.object({
   start_date: z.string(),
   end_date: z.string(),
   currency: z.string(),
+  cover_url: z.string().optional().nullable(),
 })
 
 type TripForm = z.infer<typeof tripSchema>
 
-export default function CreateTripPage() {
+interface CreateTripPageProps {
+  isEditing?: boolean
+}
+
+export default function CreateTripPage({ isEditing = false }: CreateTripPageProps) {
   const { user } = useAuthStore()
   const { setCurrentTrip } = useTripStore()
   const navigate = useNavigate()
+  const { tripId } = useParams()
 
   const [isStartDateOpen, setIsStartDateOpen] = useState(false)
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false)
+  const [isLoadingTrip, setIsLoadingTrip] = useState(isEditing)
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue } = useForm<TripForm>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue, reset } = useForm<TripForm>({
     resolver: zodResolver(tripSchema),
     defaultValues: {
       title: '',
@@ -41,35 +48,73 @@ export default function CreateTripPage() {
       currency: 'CNY',
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date().toISOString().split('T')[0],
+      cover_url: '',
     }
   })
+
+  useEffect(() => {
+    if (isEditing && tripId) {
+      async function fetchTrip() {
+        const { data, error } = await supabase
+          .from('trips')
+          .select('*')
+          .eq('id', tripId)
+          .single()
+        
+        if (data && !error) {
+          reset({
+            title: data.title,
+            destination: data.destination,
+            currency: data.currency || 'CNY',
+            start_date: data.start_date,
+            end_date: data.end_date,
+            cover_url: data.cover_url || '',
+          })
+        }
+        setIsLoadingTrip(false)
+      }
+      fetchTrip()
+    }
+  }, [isEditing, tripId, reset])
 
   const onSubmit = async (data: TripForm) => {
     if (!user) return
 
     try {
-      const { data: trip, error } = await supabase
-        .from('trips')
-        .insert({
-          ...data,
-          owner_id: user.id,
+      if (isEditing && tripId) {
+        const { error } = await supabase
+          .from('trips')
+          .update({
+            ...data,
+          })
+          .eq('id', tripId)
+        
+        if (error) throw error
+        navigate('/trips')
+      } else {
+        const { data: trip, error } = await supabase
+          .from('trips')
+          .insert({
+            ...data,
+            owner_id: user.id,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+
+        const newTrip = trip as Trip
+
+        await supabase.from('trip_members').insert({
+          trip_id: newTrip.id,
+          user_id: user.id,
+          display_name: user.email?.split('@')[0] || 'Owner',
+          role: 'owner',
         })
-        .select()
-        .single()
 
-      if (error) throw error
-
-      const newTrip = trip as Trip
-
-      await supabase.from('trip_members').insert({
-        trip_id: newTrip.id,
-        user_id: user.id,
-        display_name: user.email?.split('@')[0] || 'Owner',
-        role: 'owner',
-      })
-
-      setCurrentTrip(newTrip)
-      navigate('/trips')
+        setCurrentTrip(newTrip)
+        navigate('/trips')
+      }
     } catch (error: any) {
       alert(error.message)
     }
@@ -81,6 +126,14 @@ export default function CreateTripPage() {
   const formatDisplayDate = (dateStr: string) => {
     if (!dateStr) return '-- / -- / --'
     return dateStr.replace(/-/g, ' / ')
+  }
+
+  if (isLoadingTrip) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-10 h-10 animate-spin text-white/20" />
+      </div>
+    )
   }
 
   return (
@@ -101,22 +154,26 @@ export default function CreateTripPage() {
           onClick={() => navigate('/trips')}
           className="group relative inline-flex items-center gap-3 py-2 px-4 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/10 hover:border-white/20 transition-all duration-500 mb-6 shadow-lg"
         >
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-white/0 via-white/5 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] relative z-10">&lt; 返回</span>
+          <ArrowLeft className="w-3 h-3 text-white/50 group-hover:text-white transition-colors" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.2em] relative z-10">返回列表</span>
         </button>
 
         <header className="mb-12 flex flex-col items-center text-center">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
-            <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">ADVENTURE</span>
+            <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.3em] drop-shadow-sm">{isEditing ? 'EDIT' : 'ADVENTURE'}</span>
             <div className="w-8 h-[2px] bg-white/50 rounded-full shadow-sm" />
           </div>
-          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">开启新旅程</h1>
-          <p className="text-white/80 font-medium drop-shadow-sm">规划您的下一段精彩冒险。</p>
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">
+            {isEditing ? '修改旅程' : '开启新旅程'}
+          </h1>
+          <p className="text-white/80 font-medium drop-shadow-sm">
+            {isEditing ? '重新定义您的探索方案。' : '规划您的下一段精彩冒险。'}
+          </p>
         </header>
 
         <FadeContent duration={600} blur={true}>
-          <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-7 md:p-10 rounded-[40px] space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="glass-card p-7 md:p-10 rounded-[44px] space-y-6">
             <div className="space-y-2.5">
               <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">旅程标题</label>
               <input
@@ -206,17 +263,27 @@ export default function CreateTripPage() {
               />
             </div>
 
+            <div className="space-y-2.5">
+              <label className="text-xs font-black text-text-sub uppercase tracking-[0.2em] ml-1">背景图片 URL</label>
+              <input
+                {...register('cover_url')}
+                placeholder="https://images.unsplash.com/..."
+                className="glass-input w-full placeholder:text-white/10"
+              />
+              <p className="text-[10px] text-white/30 font-medium ml-1">输入高质量图片链接，为您的旅程增色。</p>
+            </div>
+
             <motion.button
               type="submit"
               disabled={isSubmitting}
               whileTap={{ scale: 0.98 }}
-              className="relative w-full h-16 mt-6 bg-white/10 hover:bg-white/15 backdrop-blur-xl border border-white/20 rounded-[24px] flex items-center justify-center transition-all duration-500 overflow-hidden shadow-2xl"
+              className="relative w-full h-16 mt-6 bg-white text-black hover:bg-white/90 backdrop-blur-xl border border-white/20 rounded-[24px] flex items-center justify-center transition-all duration-500 overflow-hidden shadow-2xl"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
               {isSubmitting ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <span className="tracking-[0.2em] font-black">创建旅程</span>
+                <span className="tracking-[0.2em] font-black uppercase">{isEditing ? '保存修改' : '创建旅程'}</span>
               )}
             </motion.button>
           </form>

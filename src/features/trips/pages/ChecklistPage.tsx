@@ -3,8 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { Plus, Loader2, Trash2, Edit2, ListTodo, CheckCircle2, Circle } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit2, ListTodo, CheckCircle2, Circle, Users2, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { TripMember } from '@/types/trip'
 
 export default function ChecklistPage() {
   const { currentTrip } = useTripStore()
@@ -32,6 +33,36 @@ export default function ChecklistPage() {
     enabled: !!currentTrip && !!user
   })
 
+  const { data: members } = useQuery<TripMember[]>({
+    queryKey: ['members', currentTrip?.id],
+    queryFn: async () => {
+      if (!currentTrip) return []
+      const { data, error } = await supabase
+        .from('trip_members')
+        .select('*')
+        .eq('trip_id', currentTrip.id)
+        .order('joined_at', { ascending: true })
+      if (error) throw error
+      return data as TripMember[]
+    },
+    enabled: !!currentTrip,
+  })
+
+  const { data: personalShares } = useQuery({
+    queryKey: ['personalChecklistShares', currentTrip?.id, currentMember?.id],
+    queryFn: async () => {
+      if (!currentTrip || !currentMember) return []
+      const { data, error } = await (supabase as any)
+        .from('trip_personal_checklist_shares')
+        .select('*, shared_member:trip_members!trip_personal_checklist_shares_shared_member_id_fkey(id, display_name, avatar_url)')
+        .eq('trip_id', currentTrip.id)
+        .eq('owner_member_id', currentMember.id)
+      if (error) throw error
+      return data as any[]
+    },
+    enabled: !!currentTrip && !!currentMember,
+  })
+
   // 获取清单列表
   const { data: checklists, isLoading } = useQuery({
     queryKey: ['checklists', currentTrip?.id, activeCategory, currentMember?.id],
@@ -39,13 +70,9 @@ export default function ChecklistPage() {
       if (!currentTrip) return []
       let query = supabase
         .from('trip_checklists')
-        .select('*, completed_by:trip_members(display_name)')
+        .select('*, completed_by:trip_members!trip_checklists_completed_by_member_id_fkey(display_name), owner:trip_members!trip_checklists_created_by_member_id_fkey(display_name)')
         .eq('trip_id', currentTrip.id)
         .eq('category', activeCategory)
-      
-      if (activeCategory === 'personal' && currentMember) {
-        query = query.eq('created_by_member_id', currentMember.id)
-      }
 
       const { data, error } = await query.order('created_at', { ascending: false })
       
@@ -56,10 +83,45 @@ export default function ChecklistPage() {
     retry: false
   })
 
+  const sharedMemberIds = new Set((personalShares || []).map((share) => share.shared_member_id))
+  const shareableMembers = (members || []).filter((member) => member.id !== currentMember?.id)
+
+  const handleToggleShare = async (memberId: string) => {
+    if (!currentTrip || !currentMember) return
+
+    const isShared = sharedMemberIds.has(memberId)
+    const request = isShared
+      ? (supabase as any)
+          .from('trip_personal_checklist_shares')
+          .delete()
+          .eq('trip_id', currentTrip.id)
+          .eq('owner_member_id', currentMember.id)
+          .eq('shared_member_id', memberId)
+      : (supabase as any)
+          .from('trip_personal_checklist_shares')
+          .insert({
+            trip_id: currentTrip.id,
+            owner_member_id: currentMember.id,
+            shared_member_id: memberId,
+          })
+
+    const { error } = await request
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['personalChecklistShares', currentTrip.id, currentMember.id] })
+  }
+
   // 添加新清单
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newItemTitle.trim() || !currentTrip) return
+    if (activeCategory === 'personal' && !currentMember) {
+      alert("您不在该旅程成员中，无法添加个人清单")
+      return
+    }
     
     const { error } = await supabase.from('trip_checklists').insert({
       trip_id: currentTrip.id,
@@ -187,6 +249,54 @@ export default function ChecklistPage() {
         </button>
       </form>
 
+      {activeCategory === 'personal' && currentMember && (
+        <div className="mb-8 glass-card p-5 sm:p-6 rounded-[28px] border border-white/10 shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-white">
+                <Users2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-white font-black text-lg tracking-tight">共享个人清单</h2>
+                <p className="text-white/60 text-xs font-bold mt-1">允许指定伙伴查看并确认你的个人准备项。</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-black bg-white/10 text-white px-3 py-1 rounded-full uppercase tracking-widest border border-white/10 w-fit">
+              {sharedMemberIds.size} 人可见
+            </span>
+          </div>
+
+          {shareableMembers.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {shareableMembers.map((member) => {
+                const isShared = sharedMemberIds.has(member.id)
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => handleToggleShare(member.id)}
+                    className={`group/member flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border transition-all active:scale-95 ${
+                      isShared
+                        ? 'bg-white text-black border-white shadow-lg'
+                        : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center border transition-all ${
+                      isShared ? 'bg-black text-white border-black' : 'border-white/20 text-transparent group-hover/member:text-white/50'
+                    }`}>
+                      <Check className="w-3 h-3" />
+                    </span>
+                    <span className="text-xs font-black tracking-wide">{member.display_name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-white/50 text-sm font-medium">暂无可共享的同行成员。</p>
+          )}
+        </div>
+      )}
+
       {/* 列表内容 */}
       {isLoading ? (
         <div className="flex items-center justify-center py-32">
@@ -196,6 +306,11 @@ export default function ChecklistPage() {
         <div className="space-y-3">
           <AnimatePresence mode="popLayout">
             {checklists.map((item) => (
+              (() => {
+                const isOwnPersonalItem = activeCategory === 'personal' && item.created_by_member_id === currentMember?.id
+                const canManageItem = activeCategory === 'public' || isOwnPersonalItem
+
+                return (
               <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -246,26 +361,36 @@ export default function ChecklistPage() {
                       {item.completed_by.display_name}
                     </span>
                   )}
+
+                  {activeCategory === 'personal' && !isOwnPersonalItem && item.owner && (
+                    <span className="shrink-0 text-[10px] font-black bg-white/10 text-white/70 px-3 py-1 rounded-full uppercase tracking-widest border border-white/10 shadow-md drop-shadow-sm">
+                      来自 {item.owner.display_name}
+                    </span>
+                  )}
                 </div>
 
                 {/* Actions */}
-                <div className="shrink-0 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                  {editingId !== item.id && (
+                {canManageItem && (
+                  <div className="shrink-0 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    {editingId !== item.id && (
+                      <button
+                        onClick={() => startEdit(item)}
+                        className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
-                      onClick={() => startEdit(item)}
-                      className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                      onClick={() => handleDelete(item.id)}
+                      className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                  </div>
+                )}
               </motion.div>
+                )
+              })()
             ))}
           </AnimatePresence>
         </div>
@@ -280,7 +405,7 @@ export default function ChecklistPage() {
           <p className="text-white/80 font-medium text-sm drop-shadow-sm">
             {activeCategory === 'public' 
               ? '开始添加你们的行前待办清单吧。' 
-              : '记录下你个人的准备事项，只有你自己能看到。'}
+              : '记录下个人准备事项，也可以共享给室友或同行伙伴。'}
           </p>
         </div>
       )}

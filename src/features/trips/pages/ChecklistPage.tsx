@@ -136,20 +136,19 @@ export default function ChecklistPage() {
       </header>
 
       {/* 分类切换器 */}
-      <div className="flex p-1.5 bg-black/20 backdrop-blur-md rounded-[20px] mb-8 w-fit mx-auto border border-white/10 shadow-lg overflow-hidden relative">
+      <div className="flex p-1.5 bg-black/20 backdrop-blur-md rounded-[22px] mb-8 w-fit mx-auto border border-white/10 shadow-lg overflow-hidden relative">
         <motion.div
-          className="absolute inset-y-1.5 bg-white rounded-[14px] shadow-xl"
+          className="absolute left-1.5 inset-y-1.5 bg-white rounded-[16px] shadow-xl"
           initial={false}
           animate={{
             x: activeCategory === 'public' ? 0 : '100%',
-            width: '50%'
           }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{ type: "spring", stiffness: 350, damping: 35 }}
           style={{ width: 'calc(50% - 6px)' }}
         />
         <button
           onClick={() => setActiveCategory('public')}
-          className={`relative z-10 px-8 py-2.5 rounded-[14px] text-sm font-black transition-colors duration-500 flex items-center gap-2 ${
+          className={`relative z-10 w-32 py-2.5 rounded-[16px] text-sm font-black transition-colors duration-500 flex items-center justify-center gap-2 ${
             activeCategory === 'public' ? 'text-black' : 'text-white/50 hover:text-white'
           }`}
         >
@@ -158,7 +157,7 @@ export default function ChecklistPage() {
         </button>
         <button
           onClick={() => setActiveCategory('personal')}
-          className={`relative z-10 px-8 py-2.5 rounded-[14px] text-sm font-black transition-colors duration-500 flex items-center gap-2 ${
+          className={`relative z-10 w-32 py-2.5 rounded-[16px] text-sm font-black transition-colors duration-500 flex items-center justify-center gap-2 ${
             activeCategory === 'personal' ? 'text-black' : 'text-white/50 hover:text-white'
           }`}
         >

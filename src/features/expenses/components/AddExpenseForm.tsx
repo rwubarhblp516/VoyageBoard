@@ -46,13 +46,15 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
     enabled: !!currentTrip,
   })
 
+  const currentMemberId = members?.find(m => m.user_id === user?.id)?.id || ''
+
   const { register, handleSubmit, watch, setValue, formState: { isSubmitting, errors } } = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
     values: {
       title: editingExpense?.title || '',
       amount: editingExpense ? (Number(editingExpense.amount) / 100).toString() : '',
       category: editingExpense?.category ? (['food','hotel','transport','flight','train','car_rental','ticket','shopping','entertainment','grocery','other'].includes(editingExpense.category) ? editingExpense.category : 'other') : 'other',
-      payer_member_id: editingExpense?.payer_member_id || '',
+      payer_member_id: editingExpense?.payer_member_id || currentMemberId,
       expense_date: editingExpense?.expense_date || new Date().toISOString().split('T')[0],
       participant_ids: editingExpense?.participants?.map((p: any) => p.member_id) || members?.map(m => m.id) || [],
       split_type: editingExpense?.participants?.length === 1 && editingExpense.participants[0].member_id === editingExpense.payer_member_id ? 'individual' : 'equal',
@@ -76,10 +78,23 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
   // Handle Split Type changes
   const handleSplitTypeChange = (type: 'equal' | 'individual') => {
     setValue('split_type', type)
-    if (type === 'individual' && payerId) {
-      setValue('participant_ids', [payerId])
+    if (type === 'individual') {
+      const individualPayerId = payerId || currentMemberId
+      if (individualPayerId) {
+        setValue('payer_member_id', individualPayerId)
+        setValue('participant_ids', [individualPayerId])
+      } else {
+        setValue('participant_ids', [])
+      }
     } else if (type === 'equal') {
       setValue('participant_ids', members?.map(m => m.id) || [])
+    }
+  }
+
+  const handlePayerChange = (memberId: string) => {
+    setValue('payer_member_id', memberId)
+    if (splitType === 'individual') {
+      setValue('participant_ids', [memberId])
     }
   }
 
@@ -341,7 +356,7 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
           onClose={() => setPayerOpen(false)}
           options={payerOptions}
           value={payerId}
-          onChange={(val) => setValue('payer_member_id', val)}
+          onChange={handlePayerChange}
           title="选择付款人"
         />
       </div>

@@ -1,9 +1,7 @@
-import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
-import { Plus, Loader2, Utensils, Car, Ticket, ShoppingBag, Hotel, MoreHorizontal, ReceiptText, Plane, Train, ShoppingBasket, Tag, Bus, Search, Trash2 } from 'lucide-react'
-import AddExpenseForm from '../components/AddExpenseForm'
+import { Loader2, Utensils, Car, Ticket, ShoppingBag, Hotel, MoreHorizontal, ReceiptText, Plane, Train, ShoppingBasket, Tag, Bus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion } from 'framer-motion'
 import { useUIStore } from '@/stores/useUIStore'
@@ -28,7 +26,7 @@ const getCategoryIcon = (category: string) => {
 
 export default function ExpenseListPage() {
   const { currentTrip } = useTripStore()
-  const [searchQuery, setSearchQuery] = useState('')
+  const searchQuery = ''
   const queryClient = useQueryClient()
   const { openAddExpense } = useUIStore()
 

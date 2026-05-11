@@ -6,6 +6,7 @@ import { Plus, Loader2, Utensils, Car, Ticket, ShoppingBag, Hotel, MoreHorizonta
 import AddExpenseForm from '../components/AddExpenseForm'
 import { format } from 'date-fns'
 import { motion } from 'framer-motion'
+import { useUIStore } from '@/stores/useUIStore'
 
 const categoryIcons: Record<string, React.ReactNode> = {
   food: <Utensils className="w-5 h-5" />,
@@ -27,10 +28,9 @@ const getCategoryIcon = (category: string) => {
 
 export default function ExpenseListPage() {
   const { currentTrip } = useTripStore()
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [editingExpense, setEditingExpense] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const queryClient = useQueryClient()
+  const { openAddExpense } = useUIStore()
 
   const { data: expenses, isLoading } = useQuery({
     queryKey: ['expenses', currentTrip?.id],
@@ -78,38 +78,7 @@ export default function ExpenseListPage() {
         <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md mb-2">记账账单</h1>
         <p className="text-white/80 font-medium drop-shadow-sm mb-8">清楚记录，享受每一次探索。</p>
         
-        <div className="flex items-center gap-4 w-full max-w-2xl">
-          {/* Search Bar */}
-          <div className="relative flex-1 w-full">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-white/30" />
-            </div>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索账单标题或分类..."
-              className="w-full bg-black/20 backdrop-blur-md border border-white/10 rounded-2xl pl-11 pr-4 py-3.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all font-medium shadow-inner placeholder:text-white/50"
-            />
-          </div>
-        </div>
       </header>
-
-      {/* Floating Add Button */}
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
-        <motion.button
-          onClick={() => {
-            setEditingExpense(null)
-            setShowAddForm(true)
-          }}
-          whileHover={{ scale: 1.1, boxShadow: "0 20px 40px rgba(255,255,255,0.15)" }}
-          whileTap={{ scale: 0.9 }}
-          className="w-14 h-14 bg-white text-slate-950 rounded-full flex items-center justify-center shadow-[0_15px_40px_rgba(0,0,0,0.5)] group overflow-hidden relative"
-        >
-          <div className="absolute inset-0 bg-gradient-to-tr from-white via-slate-100 to-white opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-          <Plus className="h-6 w-6 relative z-10" />
-        </motion.button>
-      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">
@@ -127,8 +96,7 @@ export default function ExpenseListPage() {
                 dragConstraints={{ left: -80, right: 0 }}
                 dragElastic={0.1}
                 onClick={() => {
-                  setEditingExpense(expense)
-                  setShowAddForm(true)
+                  openAddExpense(expense)
                 }}
                 className="relative z-10 glass-card flex items-center gap-4 sm:gap-6 cursor-pointer p-5 rounded-[28px] border-white/5 transition-colors hover:border-white/10 w-full"
               >
@@ -175,24 +143,13 @@ export default function ExpenseListPage() {
           </div>
           <p className="text-text-sub font-bold text-[10px] mb-8 uppercase tracking-[0.4em]">暂无开支记录</p>
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => openAddExpense()}
             className="group inline-flex items-center gap-2 text-white font-bold text-xs tracking-[0.1em] transition-all"
           >
             <span className="border-b border-white/20 pb-1 group-hover:border-white transition-colors">开始记录第一笔</span>
             <span className="group-hover:translate-x-1 transition-transform">→</span>
           </button>
         </div>
-      )}
-
-      {showAddForm && (
-        <AddExpenseForm
-          editingExpense={editingExpense}
-          onClose={() => {
-            setShowAddForm(false)
-            setEditingExpense(null)
-          }}
-          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['expenses', currentTrip?.id] })}
-        />
       )}
     </div>
   )

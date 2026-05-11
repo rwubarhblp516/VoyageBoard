@@ -5,10 +5,14 @@ import {
   Settings as SettingsIcon,
   Users,
   ListTodo,
-  Calculator
+  Calculator,
+  Plus
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import LightPillar from '@/components/LightPillar'
+import { useUIStore } from '@/stores/useUIStore'
+import AddExpenseForm from '@/features/expenses/components/AddExpenseForm'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function MainLayout() {
   const navigate = useNavigate()
@@ -17,10 +21,13 @@ export default function MainLayout() {
   const navItems = [
     { id: '/', icon: LayoutDashboard, label: '总览' },
     { id: '/checklist', icon: ListTodo, label: '清单' },
-    { id: '/expenses', icon: Receipt, label: '记账' },
+    { id: '/expenses', icon: Receipt, label: '记账', isCenter: true },
     { id: '/settlement', icon: Calculator, label: '结算' },
     { id: '/settings', icon: SettingsIcon, label: '设置' },
   ]
+
+  const { isAddExpenseModalOpen, openAddExpense, closeAddExpense, editingExpense } = useUIStore()
+  const queryClient = useQueryClient()
 
   return (
     <div className="relative min-h-screen bg-bg-base text-slate-200 font-sans selection:bg-white/10 selection:text-white">
@@ -62,11 +69,45 @@ export default function MainLayout() {
         <motion.div
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-black/40 backdrop-blur-[40px] saturate-[200%] border border-white/10 px-2 py-2 rounded-[36px] flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+          className="bg-black/60 backdrop-blur-[40px] saturate-[200%] border border-white/10 px-2 py-2 rounded-[36px] flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.6)] relative"
         >
-          {navItems.map((item) => {
+          {navItems.map((item: any) => {
             const Icon = item.icon
             const isActive = location.pathname === item.id || (item.id !== '/' && location.pathname.startsWith(item.id))
+            const isCenter = item.isCenter
+
+            if (isCenter) {
+              return (
+                <div key={item.id} className="relative flex-1 flex justify-center -mt-8">
+                  <motion.button
+                    onClick={() => {
+                      if (isActive) {
+                        openAddExpense()
+                      } else {
+                        navigate(item.id)
+                      }
+                    }}
+                    whileHover={{ scale: 1.1, y: -4 }}
+                    whileTap={{ scale: 0.9 }}
+                    className={`w-16 h-16 rounded-full flex items-center justify-center shadow-[0_15px_35px_rgba(0,0,0,0.5)] transition-all duration-500 border-4 border-black/40 ${isActive 
+                      ? 'bg-white text-black' 
+                      : 'bg-[#1a1a1a] text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {isActive ? (
+                      <Plus className="h-7 w-7" strokeWidth={3} />
+                    ) : (
+                      <Icon className="h-6 w-6" strokeWidth={2.5} />
+                    )}
+                  </motion.button>
+                  {isActive && (
+                    <span className="absolute top-18 text-[10px] font-black text-white/80 uppercase tracking-[0.2em] drop-shadow-md">
+                      记一笔
+                    </span>
+                  )}
+                </div>
+              )
+            }
 
             return (
               <button
@@ -80,7 +121,7 @@ export default function MainLayout() {
                 {isActive && (
                   <motion.div
                     layoutId="nav-bg"
-                    className="absolute inset-0 bg-white/10 border border-white/5 rounded-[24px] shadow-sm"
+                    className="absolute inset-0 bg-white/5 border border-white/5 rounded-[24px]"
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                     style={{ zIndex: -1 }}
                   />
@@ -94,6 +135,21 @@ export default function MainLayout() {
           })}
         </motion.div>
       </nav>
+
+      {/* Global Add Expense Modal */}
+      <AnimatePresence>
+        {isAddExpenseModalOpen && (
+          <AddExpenseForm 
+            editingExpense={editingExpense}
+            onClose={closeAddExpense}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ['expenses'] })
+              queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+              queryClient.invalidateQueries({ queryKey: ['settlement'] })
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

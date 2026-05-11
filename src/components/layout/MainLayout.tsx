@@ -113,7 +113,7 @@ export default function MainLayout() {
                   </span>
 
                   {!isActive && (
-                    <span className="text-[10px] font-bold tracking-widest uppercase text-white/40 mt-1.5">
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-white/40 transition-all duration-500 opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto mt-0 group-hover:mt-1.5">
                       {item.label}
                     </span>
                   )}

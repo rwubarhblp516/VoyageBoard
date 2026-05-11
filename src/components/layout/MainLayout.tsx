@@ -90,10 +90,10 @@ export default function MainLayout() {
                     animate={{
                       y: isActive ? -28 : 0,
                     }}
-                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    className={`flex items-center justify-center transition-all duration-500 z-20 ${isActive 
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`flex items-center justify-center transition-all duration-200 z-20 ${isActive 
                       ? 'w-16 h-16 rounded-full bg-white text-black shadow-[0_15px_35px_rgba(0,0,0,0.5)] border-4 border-black/60' 
                       : 'w-12 h-12 rounded-[24px] text-white/40 hover:text-white/80'
                     }`}
@@ -105,7 +105,7 @@ export default function MainLayout() {
                     )}
                   </motion.button>
                   
-                  <span className={`absolute transition-all duration-500 text-[10px] font-bold uppercase tracking-widest ${isActive 
+                  <span className={`absolute transition-all duration-200 text-[10px] font-bold uppercase tracking-widest ${isActive 
                     ? 'top-14 opacity-100 text-white/80' 
                     : 'top-10 opacity-0'
                   }`}>
@@ -113,7 +113,7 @@ export default function MainLayout() {
                   </span>
 
                   {!isActive && (
-                    <span className="text-[10px] font-bold tracking-widest uppercase text-white/40 transition-all duration-500 opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto mt-0 group-hover:mt-1.5">
+                    <span className="text-[10px] font-bold tracking-widest uppercase text-white/40 transition-all duration-200 opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto mt-0 group-hover:mt-1.5">
                       {item.label}
                     </span>
                   )}
@@ -125,7 +125,7 @@ export default function MainLayout() {
               <button
                 key={item.id}
                 onClick={() => navigate(item.id)}
-                className={`relative flex flex-col items-center justify-center gap-1.5 flex-1 py-3 h-16 rounded-[24px] transition-all duration-500 group z-10 ${isActive
+                className={`relative flex flex-col items-center justify-center gap-1.5 flex-1 py-3 h-16 rounded-[24px] transition-all duration-200 group z-10 ${isActive
                   ? 'text-white'
                   : 'text-white/40 hover:text-white/80'
                   }`}
@@ -134,12 +134,12 @@ export default function MainLayout() {
                   <motion.div
                     layoutId="nav-bg"
                     className="absolute inset-0 bg-white/5 border border-white/5 rounded-[24px]"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                     style={{ zIndex: -1 }}
                   />
                 )}
-                <Icon className={`h-5 w-5 transition-transform duration-500 ${isActive ? 'scale-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]' : 'group-hover:scale-110'}`} strokeWidth={isActive ? 2.5 : 2} />
-                <span className={`text-[10px] font-bold tracking-widest uppercase transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto mt-0'}`}>
+                <Icon className={`h-5 w-5 transition-transform duration-200 ${isActive ? 'scale-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]' : 'group-hover:scale-110'}`} strokeWidth={isActive ? 2.5 : 2} />
+                <span className={`text-[10px] font-bold tracking-widest uppercase transition-all duration-200 ${isActive ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden group-hover:opacity-100 group-hover:h-auto mt-0'}`}>
                   {item.label}
                 </span>
               </button>

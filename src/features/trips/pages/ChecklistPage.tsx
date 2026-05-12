@@ -43,7 +43,7 @@ export default function ChecklistPage() {
   const queryClient = useQueryClient()
 
   const [newItemTitle, setNewItemTitle] = useState('')
-  const [newItemKind, setNewItemKind] = useState<ChecklistKind>('item')
+  const [isAddingGroup, setIsAddingGroup] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState('none')
   const [activeCategory, setActiveCategory] = useState<ChecklistScope>('public')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -183,7 +183,8 @@ export default function ChecklistPage() {
       return
     }
 
-    const parentId = newItemKind === 'item' && selectedGroupId !== 'none' ? selectedGroupId : null
+    const newItemKind: ChecklistKind = isAddingGroup ? 'group' : 'item'
+    const parentId = !isAddingGroup && selectedGroupId !== 'none' ? selectedGroupId : null
     const parentGroup = parentId ? groups.find((group) => group.id === parentId) : null
 
     if (parentGroup && !canManageItem(parentGroup)) {
@@ -191,20 +192,23 @@ export default function ChecklistPage() {
       return
     }
 
-    const { error } = await supabase.from('trip_checklists').insert({
+    const { data, error } = await supabase.from('trip_checklists').insert({
       trip_id: currentTrip.id,
       title: newItemTitle.trim(),
       category: activeCategory,
       item_kind: newItemKind,
       parent_id: parentId,
       created_by_member_id: currentMember?.id,
-    })
+    }).select('id').single()
 
     if (error) {
       alert(error.message)
     } else {
       setNewItemTitle('')
-      if (newItemKind === 'group') setSelectedGroupId('none')
+      if (isAddingGroup) {
+        setIsAddingGroup(false)
+        setSelectedGroupId(data?.id || 'none')
+      }
       invalidateChecklists()
     }
   }
@@ -450,44 +454,11 @@ export default function ChecklistPage() {
       </div>
 
       <form onSubmit={handleAdd} className="mb-8 glass-card p-3 sm:p-4 rounded-[28px] border border-white/10 shadow-lg">
-        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto_auto] gap-3 items-center">
-          <div className="flex p-1 bg-black/25 rounded-2xl border border-white/10">
-            <button
-              type="button"
-              onClick={() => setNewItemKind('item')}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${newItemKind === 'item' ? 'bg-white text-black' : 'text-white/60 hover:text-white'}`}
-            >
-              项目
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setNewItemKind('group')
-                setSelectedGroupId('none')
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${newItemKind === 'group' ? 'bg-white text-black' : 'text-white/60 hover:text-white'}`}
-            >
-              分类
-            </button>
-          </div>
-
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              {newItemKind === 'group' ? <FolderPlus className="h-5 w-5 text-white/40" /> : <ListTodo className="h-5 w-5 text-white/40" />}
-            </div>
-            <input
-              type="text"
-              value={newItemTitle}
-              onChange={(e) => setNewItemTitle(e.target.value)}
-              placeholder={newItemKind === 'group' ? '添加自定义分类，例如：药物...' : '添加准备事项，例如：感冒药...'}
-              className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
-            />
-          </div>
-
+        <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr_auto_auto] gap-3 items-center">
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            disabled={newItemKind === 'group' || groupOptions.length === 0}
+            disabled={isAddingGroup || groupOptions.length === 0}
             className="bg-black/25 border border-white/15 rounded-2xl px-4 py-3.5 text-sm font-bold text-white focus:outline-none disabled:opacity-45"
           >
             <option value="none">不分类</option>
@@ -496,13 +467,42 @@ export default function ChecklistPage() {
             ))}
           </select>
 
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              {isAddingGroup ? <FolderPlus className="h-5 w-5 text-white/40" /> : <ListTodo className="h-5 w-5 text-white/40" />}
+            </div>
+            <input
+              type="text"
+              value={newItemTitle}
+              onChange={(e) => setNewItemTitle(e.target.value)}
+              placeholder={isAddingGroup ? '分类名称，例如：药物...' : '添加准备事项，例如：感冒药...'}
+              className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsAddingGroup((current) => !current)
+              setSelectedGroupId('none')
+            }}
+            className={`h-12 px-5 rounded-2xl flex items-center justify-center gap-2 border font-black text-sm transition-all active:scale-95 ${
+              isAddingGroup
+                ? 'bg-white text-black border-white'
+                : 'bg-white/5 text-white/75 border-white/10 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <FolderPlus className="w-4 h-4" />
+            {isAddingGroup ? '添加项目' : '添加分类'}
+          </button>
+
           <button
             type="submit"
             disabled={!newItemTitle.trim()}
             className="h-12 px-5 rounded-2xl flex items-center justify-center gap-2 bg-white text-black disabled:bg-white/10 disabled:text-white/30 font-black text-sm transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            添加
+            {isAddingGroup ? '保存分类' : '添加'}
           </button>
         </div>
       </form>

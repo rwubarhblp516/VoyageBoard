@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -579,63 +580,69 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         <span className="text-sm font-black tracking-widest">添加记录</span>
       </motion.button>
 
-      <AnimatePresence>
-        {pickerOpen && (
-          <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6">
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 30, scale: 0.98 }}
-              className="w-full max-w-xl glass-card rounded-[32px] border border-white/10 p-5 sm:p-6 shadow-2xl"
-            >
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.28em] text-white/45">NEW ENTRY</span>
-                  <h2 className="text-2xl font-black text-white mt-1">选择记录类型</h2>
+      <ModalPortal>
+        <AnimatePresence>
+          {pickerOpen && (
+            <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6">
+              <motion.div
+                initial={{ opacity: 0, y: 40, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 30, scale: 0.98 }}
+                className="w-full max-w-xl glass-card rounded-[32px] border border-white/10 p-5 sm:p-6 shadow-2xl"
+              >
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.28em] text-white/45">NEW ENTRY</span>
+                    <h2 className="text-2xl font-black text-white mt-1">选择记录类型</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(false)}
+                    className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen(false)}
-                  className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {entryTypes.map((entryType) => {
-                  const Icon = entryType.icon
-                  return (
-                    <button
-                      key={entryType.value}
-                      type="button"
-                      onClick={() => openNewForm(entryType.value)}
-                      className={`rounded-[24px] border p-4 text-left transition-all hover:bg-white/10 active:scale-95 ${entryType.tone}`}
-                    >
-                      <Icon className="w-6 h-6 mb-4" />
-                      <span className="block text-base font-black text-white">{entryType.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </motion.div>
-          </div>
-        )}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {entryTypes.map((entryType) => {
+                    const Icon = entryType.icon
+                    return (
+                      <button
+                        key={entryType.value}
+                        type="button"
+                        onClick={() => openNewForm(entryType.value)}
+                        className={`rounded-[24px] border p-4 text-left transition-all hover:bg-white/10 active:scale-95 ${entryType.tone}`}
+                      >
+                        <Icon className="w-6 h-6 mb-4" />
+                        <span className="block text-base font-black text-white">{entryType.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </motion.div>
+            </div>
+          )}
 
-        {formOpen && (
-          <EntryFormModal
-            form={form}
-            saving={saving}
-            editing={!!editingEntry}
-            onClose={closeForm}
-            onSave={handleSave}
-            onChange={updateForm}
-            onMapCalculate={handleMapCalculate}
-          />
-        )}
-      </AnimatePresence>
+          {formOpen && (
+            <EntryFormModal
+              form={form}
+              saving={saving}
+              editing={!!editingEntry}
+              onClose={closeForm}
+              onSave={handleSave}
+              onChange={updateForm}
+              onMapCalculate={handleMapCalculate}
+            />
+          )}
+        </AnimatePresence>
+      </ModalPortal>
     </div>
   )
+}
+
+function ModalPortal({ children }: { children: React.ReactNode }) {
+  return createPortal(children, document.body)
 }
 
 function TimelineCard({

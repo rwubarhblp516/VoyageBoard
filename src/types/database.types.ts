@@ -104,6 +104,241 @@ export type Database = {
           },
         ]
       }
+      timeline_entries: {
+        Row: {
+          address: string | null
+          content: string | null
+          created_at: string | null
+          created_by_member_id: string | null
+          day_id: string
+          duration_minutes: number | null
+          end_time: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          place_name: string | null
+          rating: number | null
+          recommend_level: string | null
+          sort_order: number
+          start_time: string | null
+          tags: string[] | null
+          title: string
+          trip_id: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          content?: string | null
+          created_at?: string | null
+          created_by_member_id?: string | null
+          day_id: string
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          place_name?: string | null
+          rating?: number | null
+          recommend_level?: string | null
+          sort_order?: number
+          start_time?: string | null
+          tags?: string[] | null
+          title: string
+          trip_id: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          content?: string | null
+          created_at?: string | null
+          created_by_member_id?: string | null
+          day_id?: string
+          duration_minutes?: number | null
+          end_time?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          place_name?: string | null
+          rating?: number | null
+          recommend_level?: string | null
+          sort_order?: number
+          start_time?: string | null
+          tags?: string[] | null
+          title?: string
+          trip_id?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_entries_created_by_member_id_fkey"
+            columns: ["created_by_member_id"]
+            isOneToOne: false
+            referencedRelation: "trip_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_entries_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "trip_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_entries_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      travel_segments: {
+        Row: {
+          arrival_time: string | null
+          created_at: string | null
+          day_id: string
+          departure_time: string | null
+          destination_address: string | null
+          destination_latitude: number | null
+          destination_longitude: number | null
+          destination_name: string
+          distance_km: number | null
+          distance_source: string
+          duration_minutes: number | null
+          id: string
+          note: string | null
+          origin_address: string | null
+          origin_latitude: number | null
+          origin_longitude: number | null
+          origin_name: string
+          route_polyline: string | null
+          sort_order: number
+          timeline_entry_id: string | null
+          transport_mode: string
+          trip_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          arrival_time?: string | null
+          created_at?: string | null
+          day_id: string
+          departure_time?: string | null
+          destination_address?: string | null
+          destination_latitude?: number | null
+          destination_longitude?: number | null
+          destination_name: string
+          distance_km?: number | null
+          distance_source?: string
+          duration_minutes?: number | null
+          id?: string
+          note?: string | null
+          origin_address?: string | null
+          origin_latitude?: number | null
+          origin_longitude?: number | null
+          origin_name: string
+          route_polyline?: string | null
+          sort_order?: number
+          timeline_entry_id?: string | null
+          transport_mode: string
+          trip_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          arrival_time?: string | null
+          created_at?: string | null
+          day_id?: string
+          departure_time?: string | null
+          destination_address?: string | null
+          destination_latitude?: number | null
+          destination_longitude?: number | null
+          destination_name?: string
+          distance_km?: number | null
+          distance_source?: string
+          duration_minutes?: number | null
+          id?: string
+          note?: string | null
+          origin_address?: string | null
+          origin_latitude?: number | null
+          origin_longitude?: number | null
+          origin_name?: string
+          route_polyline?: string | null
+          sort_order?: number
+          timeline_entry_id?: string | null
+          transport_mode?: string
+          trip_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "travel_segments_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "trip_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_segments_timeline_entry_id_fkey"
+            columns: ["timeline_entry_id"]
+            isOneToOne: false
+            referencedRelation: "timeline_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_segments_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_days: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          date: string
+          day_index: number
+          id: string
+          summary: string | null
+          title: string | null
+          trip_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string | null
+          date: string
+          day_index: number
+          id?: string
+          summary?: string | null
+          title?: string | null
+          trip_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string | null
+          date?: string
+          day_index?: number
+          id?: string
+          summary?: string | null
+          title?: string | null
+          trip_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_days_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_members: {
         Row: {
           display_name: string

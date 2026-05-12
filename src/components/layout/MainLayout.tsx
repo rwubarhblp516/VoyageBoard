@@ -7,7 +7,8 @@ import {
   ListTodo,
   Calculator,
   Plus,
-  Home
+  Home,
+  Route
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import LightPillar from '@/components/LightPillar'
@@ -24,7 +25,7 @@ export default function MainLayout() {
     { id: '/checklist', icon: ListTodo, label: '清单' },
     { id: '/expenses', icon: Receipt, label: '记账', isCenter: true },
     { id: '/settlement', icon: Calculator, label: '结算' },
-    { id: '/settings', icon: SettingsIcon, label: '设置' },
+    { id: '/timeline', icon: Route, label: '记录' },
   ]
 
   const { isAddExpenseModalOpen, openAddExpense, closeAddExpense, editingExpense } = useUIStore()

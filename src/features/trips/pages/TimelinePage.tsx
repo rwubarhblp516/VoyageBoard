@@ -19,6 +19,7 @@ import {
   Loader2,
   MapPin,
   MapPinned,
+  Newspaper,
   Navigation,
   Plane,
   Plus,
@@ -83,7 +84,9 @@ type TimelineEntry = {
   tags: string[] | null
   sort_order: number
   created_by_member_id: string | null
+  include_in_guide: boolean
   travel_segments?: TravelSegment[]
+  created_by_member?: { display_name: string } | null
 }
 
 type EntryForm = {
@@ -104,6 +107,7 @@ type EntryForm = {
   arrival_time: string
   distance_km: string
   note: string
+  include_in_guide: boolean
 }
 
 const entryTypes: Array<{ value: TimelineEntryType; label: string; icon: React.ElementType; tone: string }> = [
@@ -153,6 +157,7 @@ const emptyForm = (type: TimelineEntryType): EntryForm => ({
   arrival_time: '',
   distance_km: '',
   note: '',
+  include_in_guide: true,
 })
 
 const toLocalDate = (dateText: string) => new Date(`${dateText}T00:00:00`)
@@ -236,7 +241,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       if (!user) return null
       const { data, error } = await supabase
         .from('trip_members')
-        .select('id')
+        .select('id, role')
         .eq('trip_id', currentTrip.id)
         .eq('user_id', user.id)
         .single()
@@ -290,7 +295,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       if (!activeDay) return []
       const { data, error } = await supabase
         .from('timeline_entries')
-        .select('*, travel_segments(*)')
+        .select('*, created_by_member:trip_members!timeline_entries_created_by_member_id_fkey(display_name), travel_segments(*)')
         .eq('trip_id', currentTrip.id)
         .eq('day_id', activeDay.id)
         .order('sort_order', { ascending: true })
@@ -333,6 +338,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       arrival_time: segment?.arrival_time?.slice(0, 5) || '',
       distance_km: segment?.distance_km !== null && segment?.distance_km !== undefined ? String(segment.distance_km) : '',
       note: segment?.note || '',
+      include_in_guide: entry.include_in_guide ?? true,
     })
     setFormOpen(true)
   }
@@ -369,6 +375,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       tags,
       sort_order: editingEntry?.sort_order ?? ((entries?.length || 0) + 1),
       created_by_member_id: currentMember?.id || null,
+      include_in_guide: form.include_in_guide,
       updated_at: new Date().toISOString(),
     }
   }
@@ -458,6 +465,11 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   }
 
   const handleDelete = async (entry: TimelineEntry) => {
+    if (entry.created_by_member_id !== currentMember?.id && currentMember?.role !== 'owner') {
+      alert('只有记录作者或旅程创建者可以删除这条记录')
+      return
+    }
+
     if (!window.confirm('确认删除这条行程记录吗？')) return
 
     const { error } = await supabase.from('timeline_entries').delete().eq('id', entry.id)
@@ -554,6 +566,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
                 index={index}
                 onEdit={() => openEditForm(entry)}
                 onDelete={() => handleDelete(entry)}
+                canDelete={entry.created_by_member_id === currentMember?.id || currentMember?.role === 'owner'}
               />
             ))}
           </AnimatePresence>
@@ -650,11 +663,13 @@ function TimelineCard({
   index,
   onEdit,
   onDelete,
+  canDelete,
 }: {
   entry: TimelineEntry
   index: number
   onEdit: () => void
   onDelete: () => void
+  canDelete: boolean
 }) {
   const meta = getEntryMeta(entry.type)
   const Icon = meta.icon
@@ -706,9 +721,11 @@ function TimelineCard({
                 <button type="button" onClick={onEdit} className="p-2 rounded-xl text-white/45 hover:text-white hover:bg-white/10">
                   <Edit2 className="w-4 h-4" />
                 </button>
-                <button type="button" onClick={onDelete} className="p-2 rounded-xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {canDelete && (
+                  <button type="button" onClick={onDelete} className="p-2 rounded-xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -725,6 +742,19 @@ function TimelineCard({
                 ))}
               </div>
             )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/55 border border-white/10">
+                {entry.created_by_member?.display_name ? `记录者：${entry.created_by_member.display_name}` : '记录者未知'}
+              </span>
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black border ${
+                entry.include_in_guide
+                  ? 'bg-emerald-400/15 text-emerald-100 border-emerald-300/20'
+                  : 'bg-white/5 text-white/45 border-white/10'
+              }`}>
+                {entry.include_in_guide ? '进入攻略素材' : '不进入攻略'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -866,6 +896,8 @@ function EntryFormModal({
                 className="glass-input resize-none"
               />
             </Field>
+
+            <GuideToggle checked={form.include_in_guide} onChange={(checked) => onChange('include_in_guide', checked)} />
           </div>
         ) : (
           <div className="space-y-4">
@@ -949,6 +981,8 @@ function EntryFormModal({
                 className="glass-input resize-none"
               />
             </Field>
+
+            <GuideToggle checked={form.include_in_guide} onChange={(checked) => onChange('include_in_guide', checked)} />
           </div>
         )}
 
@@ -980,5 +1014,34 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="block pl-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/45">{label}</span>
       {children}
     </label>
+  )
+}
+
+function GuideToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`w-full rounded-2xl border px-4 py-3.5 flex items-center justify-between gap-4 transition-all ${
+        checked
+          ? 'bg-emerald-400/15 border-emerald-300/20 text-emerald-50'
+          : 'bg-white/5 border-white/10 text-white/55'
+      }`}
+    >
+      <span className="flex items-center gap-3 min-w-0 text-left">
+        <Newspaper className="w-5 h-5 shrink-0" />
+        <span className="min-w-0">
+          <span className="block text-sm font-black">{checked ? '进入攻略素材' : '不进入攻略'}</span>
+          <span className="block text-xs font-bold opacity-70 mt-0.5">后续生成旅行攻略时会优先使用已勾选记录。</span>
+        </span>
+      </span>
+      <span className={`shrink-0 w-11 h-6 rounded-full border p-0.5 transition-colors ${
+        checked ? 'bg-white border-white' : 'bg-black/20 border-white/15'
+      }`}>
+        <span className={`block h-5 w-5 rounded-full transition-transform ${
+          checked ? 'translate-x-5 bg-emerald-500' : 'translate-x-0 bg-white/50'
+        }`} />
+      </span>
+    </button>
   )
 }

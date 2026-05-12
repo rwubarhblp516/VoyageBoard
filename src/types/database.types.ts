@@ -114,6 +114,7 @@ export type Database = {
           duration_minutes: number | null
           end_time: string | null
           id: string
+          include_in_guide: boolean
           latitude: number | null
           longitude: number | null
           place_name: string | null
@@ -136,6 +137,7 @@ export type Database = {
           duration_minutes?: number | null
           end_time?: string | null
           id?: string
+          include_in_guide?: boolean
           latitude?: number | null
           longitude?: number | null
           place_name?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           duration_minutes?: number | null
           end_time?: string | null
           id?: string
+          include_in_guide?: boolean
           latitude?: number | null
           longitude?: number | null
           place_name?: string | null

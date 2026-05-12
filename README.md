@@ -88,6 +88,7 @@ Notes:
 - The migration `20260512020000_share_personal_checklists.sql` was applied to the remote database on 2026-05-12.
 - The migration `20260512043000_nested_checklist_groups.sql` adds collapsible checklist groups through `item_kind` and `parent_id`.
 - The migration `20260513043000_trip_timeline.sql` adds trip days, timeline entries, and travel segments for itinerary recording.
+- The migration `20260513062000_refine_timeline_permissions.sql` adds guide inclusion flags and limits itinerary deletion to the author or trip owner.
 - Keep database changes in timestamped SQL files under `supabase/migrations`.
 
 ## Cloudflare Pages Deployment

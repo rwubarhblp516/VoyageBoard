@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Bike,
   Bus,
+  Camera,
   CalendarDays,
   Car,
   Check,
@@ -15,6 +16,7 @@ import {
   Edit2,
   FileText,
   Hotel,
+  ImagePlus,
   Lightbulb,
   Loader2,
   MapPin,
@@ -67,6 +69,21 @@ type TravelSegment = {
   sort_order: number
 }
 
+type TimelineImage = {
+  id: string
+  trip_id: string
+  day_id: string
+  timeline_entry_id: string
+  storage_path: string
+  original_name: string | null
+  mime_type: string
+  width: number | null
+  height: number | null
+  size_bytes: number | null
+  sort_order: number
+  created_by_member_id: string | null
+}
+
 type TimelineEntry = {
   id: string
   trip_id: string
@@ -86,6 +103,7 @@ type TimelineEntry = {
   created_by_member_id: string | null
   include_in_guide: boolean
   travel_segments?: TravelSegment[]
+  images?: TimelineImage[]
   created_by_member?: { display_name: string } | null
 }
 
@@ -199,6 +217,33 @@ const getEntryMeta = (type: TimelineEntryType) => entryTypes.find((entryType) =>
 
 const getTransportMeta = (mode: string) => transportModes.find((item) => item.value === mode) || transportModes[transportModes.length - 1]
 
+const getTimelineImageUrl = (storagePath: string) => (
+  supabase.storage.from('trip-images').getPublicUrl(storagePath).data.publicUrl
+)
+
+const compressImageToWebp = async (file: File) => {
+  const bitmap = await createImageBitmap(file)
+  const maxSide = 1920
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+  const width = Math.max(1, Math.round(bitmap.width * scale))
+  const height = Math.max(1, Math.round(bitmap.height * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('当前浏览器不支持图片压缩')
+  context.drawImage(bitmap, 0, 0, width, height)
+  bitmap.close()
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/webp', 0.86)
+  })
+  if (!blob) throw new Error('图片压缩失败')
+
+  return { blob, width, height }
+}
+
 const buildExpectedDays = (startDate: string, endDate: string) => {
   const start = toLocalDate(startDate)
   const end = toLocalDate(endDate)
@@ -228,6 +273,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [formOpen, setFormOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<TimelineEntry | null>(null)
   const [form, setForm] = useState<EntryForm>(emptyForm('transport'))
+  const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
 
   const expectedDays = useMemo(
@@ -295,7 +341,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       if (!activeDay) return []
       const { data, error } = await supabase
         .from('timeline_entries')
-        .select('*, created_by_member:trip_members!timeline_entries_created_by_member_id_fkey(display_name), travel_segments(*)')
+        .select('*, created_by_member:trip_members!timeline_entries_created_by_member_id_fkey(display_name), travel_segments(*), images:timeline_entry_images(*)')
         .eq('trip_id', currentTrip.id)
         .eq('day_id', activeDay.id)
         .order('sort_order', { ascending: true })
@@ -310,8 +356,19 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  const handleSelectImages = (files: FileList | null) => {
+    if (!files) return
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'))
+    setPendingImageFiles((current) => [...current, ...imageFiles].slice(0, 12))
+  }
+
+  const handleRemovePendingImage = (index: number) => {
+    setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
+  }
+
   const openNewForm = (type: TimelineEntryType) => {
     setForm(emptyForm(type))
+    setPendingImageFiles([])
     setEditingEntry(null)
     setPickerOpen(false)
     setFormOpen(true)
@@ -320,6 +377,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const openEditForm = (entry: TimelineEntry) => {
     const segment = entry.travel_segments?.[0]
     setEditingEntry(entry)
+    setPendingImageFiles([])
     setForm({
       type: entry.type,
       title: entry.title,
@@ -346,6 +404,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const closeForm = () => {
     setFormOpen(false)
     setEditingEntry(null)
+    setPendingImageFiles([])
     setSaving(false)
   }
 
@@ -398,6 +457,69 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       note: form.note.trim() || null,
       sort_order: sortOrder,
       updated_at: new Date().toISOString(),
+    }
+  }
+
+  const uploadPendingImages = async (entryId: string) => {
+    if (!activeDay || !currentMember || pendingImageFiles.length === 0) return
+
+    const existingCount = editingEntry?.images?.length || 0
+    for (const [index, file] of pendingImageFiles.entries()) {
+      const { blob, width, height } = await compressImageToWebp(file)
+      const storagePath = `${currentTrip.id}/${entryId}/${crypto.randomUUID()}.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('trip-images')
+        .upload(storagePath, blob, {
+          contentType: 'image/webp',
+          cacheControl: '31536000',
+          upsert: false,
+        })
+
+      if (uploadError) throw uploadError
+
+      const { error: imageError } = await supabase
+        .from('timeline_entry_images')
+        .insert({
+          trip_id: currentTrip.id,
+          day_id: activeDay.id,
+          timeline_entry_id: entryId,
+          storage_path: storagePath,
+          original_name: file.name,
+          mime_type: 'image/webp',
+          width,
+          height,
+          size_bytes: blob.size,
+          sort_order: existingCount + index + 1,
+          created_by_member_id: currentMember.id,
+        })
+
+      if (imageError) throw imageError
+    }
+  }
+
+  const handleDeleteImage = async (image: TimelineImage) => {
+    if (!window.confirm('确认删除这张图片吗？')) return
+
+    const { error: storageError } = await supabase.storage.from('trip-images').remove([image.storage_path])
+    if (storageError) {
+      alert(storageError.message)
+      return
+    }
+
+    const { error } = await supabase.from('timeline_entry_images').delete().eq('id', image.id)
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    if (activeDay) {
+      queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
+    }
+    if (editingEntry) {
+      setEditingEntry({
+        ...editingEntry,
+        images: (editingEntry.images || []).filter((item) => item.id !== image.id),
+      })
     }
   }
 
@@ -454,6 +576,10 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
           const { error } = await supabase.from('travel_segments').insert(segmentPayload)
           if (error) throw error
         }
+      }
+
+      if (entryId) {
+        await uploadPendingImages(entryId)
       }
 
       await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
@@ -646,6 +772,11 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               onSave={handleSave}
               onChange={updateForm}
               onMapCalculate={handleMapCalculate}
+              existingImages={editingEntry?.images || []}
+              pendingImageFiles={pendingImageFiles}
+              onSelectImages={handleSelectImages}
+              onRemovePendingImage={handleRemovePendingImage}
+              onDeleteImage={handleDeleteImage}
             />
           )}
         </AnimatePresence>
@@ -733,6 +864,25 @@ function TimelineCard({
             {(entry.content || segment?.note) && (
               <p className="mt-3 text-sm leading-6 text-white/75 break-words">{entry.content || segment?.note}</p>
             )}
+            {entry.images && entry.images.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 gap-2 overflow-hidden rounded-[18px]">
+                {entry.images.slice(0, 3).map((image, imageIndex) => (
+                  <div key={image.id} className="relative aspect-square overflow-hidden bg-black/20">
+                    <img
+                      src={getTimelineImageUrl(image.storage_path)}
+                      alt={image.original_name || `行程图片 ${imageIndex + 1}`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                    {imageIndex === 2 && entry.images && entry.images.length > 3 && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-white text-lg font-black">
+                        +{entry.images.length - 3}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {entry.tags && entry.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {entry.tags.map((tag) => (
@@ -770,6 +920,11 @@ function EntryFormModal({
   onSave,
   onChange,
   onMapCalculate,
+  existingImages,
+  pendingImageFiles,
+  onSelectImages,
+  onRemovePendingImage,
+  onDeleteImage,
 }: {
   form: EntryForm
   saving: boolean
@@ -778,6 +933,11 @@ function EntryFormModal({
   onSave: (event: React.FormEvent) => void
   onChange: <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => void
   onMapCalculate: () => void
+  existingImages: TimelineImage[]
+  pendingImageFiles: File[]
+  onSelectImages: (files: FileList | null) => void
+  onRemovePendingImage: (index: number) => void
+  onDeleteImage: (image: TimelineImage) => void
 }) {
   const meta = getEntryMeta(form.type)
   const Icon = meta.icon
@@ -986,6 +1146,14 @@ function EntryFormModal({
           </div>
         )}
 
+        <ImageUploadSection
+          existingImages={existingImages}
+          pendingImageFiles={pendingImageFiles}
+          onSelectImages={onSelectImages}
+          onRemovePendingImage={onRemovePendingImage}
+          onDeleteImage={onDeleteImage}
+        />
+
         <div className="mt-7 grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -1014,6 +1182,109 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="block pl-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/45">{label}</span>
       {children}
     </label>
+  )
+}
+
+function ImageUploadSection({
+  existingImages,
+  pendingImageFiles,
+  onSelectImages,
+  onRemovePendingImage,
+  onDeleteImage,
+}: {
+  existingImages: TimelineImage[]
+  pendingImageFiles: File[]
+  onSelectImages: (files: FileList | null) => void
+  onRemovePendingImage: (index: number) => void
+  onDeleteImage: (image: TimelineImage) => void
+}) {
+  return (
+    <section className="mt-6 rounded-[24px] border border-white/10 bg-white/5 p-4 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-white flex items-center gap-2">
+            <ImagePlus className="w-4 h-4" />
+            图片
+          </h3>
+          <p className="text-xs font-bold text-white/45 mt-1">上传前会压缩为 WebP，仅用于记录展示和生成攻略。</p>
+        </div>
+        <span className="text-[10px] font-black text-white/45 uppercase tracking-widest">
+          {existingImages.length + pendingImageFiles.length}/12
+        </span>
+      </div>
+
+      {existingImages.length > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {existingImages.map((image) => (
+            <div key={image.id} className="relative aspect-square overflow-hidden rounded-2xl bg-black/20 border border-white/10">
+              <img
+                src={getTimelineImageUrl(image.storage_path)}
+                alt={image.original_name || '行程图片'}
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+              <button
+                type="button"
+                onClick={() => onDeleteImage(image)}
+                className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1.5 text-white hover:bg-red-500"
+                aria-label="删除图片"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pendingImageFiles.length > 0 && (
+        <div className="space-y-2">
+          {pendingImageFiles.map((file, index) => (
+            <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-black/20 border border-white/10 px-3 py-2">
+              <span className="min-w-0 truncate text-xs font-bold text-white/70">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => onRemovePendingImage(index)}
+                className="shrink-0 rounded-xl p-1.5 text-white/45 hover:bg-white/10 hover:text-white"
+                aria-label="移除待上传图片"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-white/75 hover:bg-white/10 transition-all flex items-center justify-center gap-2 font-black">
+          <Camera className="w-4 h-4" />
+          拍照
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(event) => {
+              onSelectImages(event.target.files)
+              event.target.value = ''
+            }}
+          />
+        </label>
+        <label className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-4 py-3.5 text-white/75 hover:bg-white/10 transition-all flex items-center justify-center gap-2 font-black">
+          <ImagePlus className="w-4 h-4" />
+          从相册选择
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              onSelectImages(event.target.files)
+              event.target.value = ''
+            }}
+          />
+        </label>
+      </div>
+    </section>
   )
 }
 

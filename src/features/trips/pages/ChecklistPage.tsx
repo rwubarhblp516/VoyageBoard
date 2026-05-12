@@ -478,92 +478,98 @@ export default function ChecklistPage() {
       </div>
 
       <div className="mb-8 glass-card p-3 sm:p-4 rounded-[28px] border border-white/10 shadow-lg">
-        <form onSubmit={handleAdd} className="grid grid-cols-1 lg:grid-cols-[232px_1fr_auto] gap-3 items-center">
-          <div className="grid grid-cols-[1fr_48px] gap-2">
-            <select
-              value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
-              disabled={groupOptions.length === 0}
-              className="bg-black/25 border border-white/15 rounded-2xl px-4 py-3.5 text-sm font-bold text-white focus:outline-none disabled:opacity-45"
-            >
-              <option value="none">不分类</option>
-              {groupOptions.map((group) => (
-                <option key={group.id} value={group.id}>{group.title}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setIsAddingGroup((current) => !current)}
-              className={`h-12 w-12 rounded-2xl flex items-center justify-center border transition-all active:scale-95 ${
-                isAddingGroup
-                  ? 'bg-white text-black border-white'
-                  : 'bg-white/5 text-white/75 border-white/10 hover:bg-white/10 hover:text-white'
-              }`}
-              aria-label="添加分类"
-              title="添加分类"
-            >
-              <FolderPlus className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <ListTodo className="h-5 w-5 text-white/40" />
-            </div>
-            <input
-              type="text"
-              value={newItemTitle}
-              onChange={(e) => setNewItemTitle(e.target.value)}
-              placeholder={selectedGroupId === 'none' ? '添加准备事项，例如：护照...' : '添加到所选分类，例如：感冒药...'}
-              className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={!newItemTitle.trim()}
-            className="h-12 px-5 rounded-2xl flex items-center justify-center gap-2 bg-white text-black disabled:bg-white/10 disabled:text-white/30 font-black text-sm transition-all active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            添加
-          </button>
-        </form>
-
-        <AnimatePresence initial={false}>
-          {isAddingGroup && (
-            <motion.form
-              onSubmit={handleAddGroup}
-              initial={{ opacity: 0, height: 0, y: -6 }}
-              animate={{ opacity: 1, height: 'auto', y: 0 }}
-              exit={{ opacity: 0, height: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              className="overflow-hidden"
-            >
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <FolderPlus className="h-5 w-5 text-white/40" />
-                  </div>
-                  <input
-                    type="text"
-                    value={newGroupTitle}
-                    onChange={(e) => setNewGroupTitle(e.target.value)}
-                    placeholder="分类名称，例如：药物..."
-                    className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={!newGroupTitle.trim()}
-                  className="h-12 px-5 rounded-2xl flex items-center justify-center gap-2 bg-white text-black disabled:bg-white/10 disabled:text-white/30 font-black text-sm transition-all active:scale-95"
+        <div className="grid grid-cols-1 lg:grid-cols-[232px_1fr_auto] gap-3 items-start">
+          <div className="space-y-2">
+            <div className="grid grid-cols-[1fr_48px] gap-2">
+              <div className="relative">
+                <select
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                  disabled={groupOptions.length === 0}
+                  className="appearance-none w-full h-12 bg-black/25 border border-white/15 rounded-2xl pl-4 pr-11 text-sm font-bold text-white focus:outline-none disabled:opacity-45"
                 >
-                  <Check className="w-4 h-4" />
-                  保存
-                </button>
+                  <option value="none">不分类</option>
+                  {groupOptions.map((group) => (
+                    <option key={group.id} value={group.id}>{group.title}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
               </div>
-            </motion.form>
-          )}
-        </AnimatePresence>
+              <button
+                type="button"
+                onClick={() => setIsAddingGroup((current) => !current)}
+                className={`h-12 w-12 rounded-2xl flex items-center justify-center border transition-all active:scale-95 ${
+                  isAddingGroup
+                    ? 'bg-white text-black border-white'
+                    : 'bg-white/5 text-white/75 border-white/10 hover:bg-white/10 hover:text-white'
+                }`}
+                aria-label="添加分类"
+                title="添加分类"
+              >
+                <FolderPlus className="w-5 h-5" />
+              </button>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {isAddingGroup && (
+                <motion.form
+                  onSubmit={handleAddGroup}
+                  initial={{ opacity: 0, height: 0, y: -6 }}
+                  animate={{ opacity: 1, height: 'auto', y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                  className="overflow-hidden"
+                >
+                  <div className="grid grid-cols-[1fr_72px] gap-2">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <FolderPlus className="h-5 w-5 text-white/40" />
+                      </div>
+                      <input
+                        type="text"
+                        value={newGroupTitle}
+                        onChange={(e) => setNewGroupTitle(e.target.value)}
+                        placeholder="分类名称"
+                        className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!newGroupTitle.trim()}
+                      className="h-12 rounded-2xl flex items-center justify-center bg-white text-black disabled:bg-white/10 disabled:text-white/30 font-black text-sm transition-all active:scale-95"
+                    >
+                      保存
+                    </button>
+                  </div>
+                </motion.form>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <form onSubmit={handleAdd} className="contents">
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <ListTodo className="h-5 w-5 text-white/40" />
+              </div>
+              <input
+                type="text"
+                value={newItemTitle}
+                onChange={(e) => setNewItemTitle(e.target.value)}
+                placeholder={selectedGroupId === 'none' ? '添加准备事项，例如：护照...' : '添加到所选分类，例如：感冒药...'}
+                className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!newItemTitle.trim()}
+              className="h-12 px-5 rounded-2xl flex items-center justify-center gap-2 bg-white text-black disabled:bg-white/10 disabled:text-white/30 font-black text-sm transition-all active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              添加
+            </button>
+          </form>
+        </div>
       </div>
 
       {activeCategory === 'personal' && currentMember && (

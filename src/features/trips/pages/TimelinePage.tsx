@@ -12,6 +12,8 @@ import {
   Car,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Edit2,
   FileText,
@@ -32,6 +34,7 @@ import {
   Trash2,
   Utensils,
   X,
+  ZoomIn,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -865,23 +868,7 @@ function TimelineCard({
               <p className="mt-3 text-sm leading-6 text-white/75 break-words">{entry.content || segment?.note}</p>
             )}
             {entry.images && entry.images.length > 0 && (
-              <div className="mt-4 grid grid-cols-3 gap-2 overflow-hidden rounded-[18px]">
-                {entry.images.slice(0, 3).map((image, imageIndex) => (
-                  <div key={image.id} className="relative aspect-square overflow-hidden bg-black/20">
-                    <img
-                      src={getTimelineImageUrl(image.storage_path)}
-                      alt={image.original_name || `行程图片 ${imageIndex + 1}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                    {imageIndex === 2 && entry.images && entry.images.length > 3 && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-white text-lg font-black">
-                        +{entry.images.length - 3}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <TimelinePhotoStack images={entry.images} title={entry.title} />
             )}
             {entry.tags && entry.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -909,6 +896,193 @@ function TimelineCard({
         </div>
       </div>
     </motion.article>
+  )
+}
+
+function TimelinePhotoStack({ images, title }: { images: TimelineImage[]; title: string }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const featuredImages = images.slice(0, 3)
+
+  const openGallery = (index: number) => {
+    setActiveIndex(index)
+    setIsOpen(true)
+  }
+
+  return (
+    <>
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => openGallery(0)}
+          className="group relative block w-full overflow-hidden rounded-[24px] border border-white/10 bg-black/20 text-left shadow-[0_18px_36px_rgba(0,0,0,0.22)]"
+        >
+          <div className="relative aspect-[16/10] sm:aspect-[21/9] overflow-hidden">
+            <motion.img
+              src={getTimelineImageUrl(images[0].storage_path)}
+              alt={images[0].original_name || title}
+              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" />
+
+            {featuredImages.slice(1).map((image, index) => (
+              <motion.div
+                key={image.id}
+                className="absolute bottom-3 right-3 h-20 w-16 overflow-hidden rounded-2xl border border-white/30 bg-black/30 shadow-2xl sm:h-24 sm:w-20"
+                initial={false}
+                whileHover={{ y: -4, rotate: index === 0 ? 2 : -2 }}
+                style={{
+                  right: `${12 + index * 48}px`,
+                  rotate: `${index === 0 ? -5 : 5}deg`,
+                  zIndex: 3 - index,
+                }}
+              >
+                <img
+                  src={getTimelineImageUrl(image.storage_path)}
+                  alt={image.original_name || `${title} 图片 ${index + 2}`}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </motion.div>
+            ))}
+
+            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+              <span className="rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-black text-white backdrop-blur-md border border-white/10">
+                {images.length} 张图片
+              </span>
+              <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-black text-black flex items-center gap-1.5">
+                <ZoomIn className="w-3.5 h-3.5" />
+                查看
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      <ModalPortal>
+        <AnimatePresence>
+          {isOpen && (
+            <PhotoGalleryModal
+              images={images}
+              title={title}
+              activeIndex={activeIndex}
+              onActiveIndexChange={setActiveIndex}
+              onClose={() => setIsOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+      </ModalPortal>
+    </>
+  )
+}
+
+function PhotoGalleryModal({
+  images,
+  title,
+  activeIndex,
+  onActiveIndexChange,
+  onClose,
+}: {
+  images: TimelineImage[]
+  title: string
+  activeIndex: number
+  onActiveIndexChange: (index: number) => void
+  onClose: () => void
+}) {
+  const activeImage = images[activeIndex]
+  const goToPrevious = () => onActiveIndexChange((activeIndex - 1 + images.length) % images.length)
+  const goToNext = () => onActiveIndexChange((activeIndex + 1) % images.length)
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+      if (event.key === 'ArrowLeft') goToPrevious()
+      if (event.key === 'ArrowRight') goToNext()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
+  if (!activeImage) return null
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-xl flex flex-col p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 pb-4">
+        <div className="min-w-0">
+          <span className="text-[10px] font-black uppercase tracking-[0.28em] text-white/45">PHOTO GALLERY</span>
+          <h2 className="truncate text-lg sm:text-2xl font-black text-white mt-1">{title}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-2xl border border-white/10 bg-white/10 p-3 text-white/75 hover:bg-white/15 hover:text-white"
+          aria-label="关闭图片预览"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="relative mx-auto flex min-h-0 w-full max-w-6xl flex-1 items-center justify-center">
+        {images.length > 1 && (
+          <button
+            type="button"
+            onClick={goToPrevious}
+            className="absolute left-0 z-10 hidden rounded-full border border-white/10 bg-black/40 p-3 text-white/80 hover:bg-white hover:text-black sm:block"
+            aria-label="上一张"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+        )}
+
+        <AnimatePresence mode="wait">
+          <motion.img
+            key={activeImage.id}
+            src={getTimelineImageUrl(activeImage.storage_path)}
+            alt={activeImage.original_name || title}
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="max-h-full max-w-full rounded-[28px] object-contain shadow-[0_30px_90px_rgba(0,0,0,0.5)]"
+          />
+        </AnimatePresence>
+
+        {images.length > 1 && (
+          <button
+            type="button"
+            onClick={goToNext}
+            className="absolute right-0 z-10 hidden rounded-full border border-white/10 bg-black/40 p-3 text-white/80 hover:bg-white hover:text-black sm:block"
+            aria-label="下一张"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </button>
+        )}
+      </div>
+
+      <div className="mx-auto mt-4 flex w-full max-w-6xl items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+        {images.map((image, index) => (
+          <button
+            key={image.id}
+            type="button"
+            onClick={() => onActiveIndexChange(index)}
+            className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl border transition-all sm:h-20 sm:w-20 ${
+              index === activeIndex
+                ? 'border-white opacity-100'
+                : 'border-white/10 opacity-45 hover:opacity-85'
+            }`}
+          >
+            <img
+              src={getTimelineImageUrl(image.storage_path)}
+              alt={image.original_name || `${title} 缩略图 ${index + 1}`}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

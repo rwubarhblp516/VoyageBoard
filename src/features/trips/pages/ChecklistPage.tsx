@@ -1,23 +1,55 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { Plus, Loader2, Trash2, Edit2, ListTodo, CheckCircle2, Circle, Users2, Check } from 'lucide-react'
+import {
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  Circle,
+  Edit2,
+  FolderPlus,
+  ListTodo,
+  Loader2,
+  Plus,
+  Trash2,
+  Users2,
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TripMember } from '@/types/trip'
+
+type ChecklistScope = 'public' | 'personal'
+type ChecklistKind = 'item' | 'group'
+
+type ChecklistItem = {
+  id: string
+  trip_id: string
+  title: string
+  category: ChecklistScope
+  item_kind?: ChecklistKind | null
+  parent_id?: string | null
+  is_completed: boolean | null
+  completed_by_member_id: string | null
+  created_by_member_id: string | null
+  created_at: string | null
+  completed_by?: { display_name: string } | null
+  owner?: { display_name: string } | null
+}
 
 export default function ChecklistPage() {
   const { currentTrip } = useTripStore()
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
-  
+
   const [newItemTitle, setNewItemTitle] = useState('')
-  const [activeCategory, setActiveCategory] = useState<'public' | 'personal'>('public')
+  const [newItemKind, setNewItemKind] = useState<ChecklistKind>('item')
+  const [selectedGroupId, setSelectedGroupId] = useState('none')
+  const [activeCategory, setActiveCategory] = useState<ChecklistScope>('public')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set())
 
-  // 获取当前用户在这个旅程中的 member_id
   const { data: currentMember } = useQuery({
     queryKey: ['currentMember', currentTrip?.id, user?.id],
     queryFn: async () => {
@@ -30,7 +62,7 @@ export default function ChecklistPage() {
         .single()
       return data
     },
-    enabled: !!currentTrip && !!user
+    enabled: !!currentTrip && !!user,
   })
 
   const { data: members } = useQuery<TripMember[]>({
@@ -63,28 +95,57 @@ export default function ChecklistPage() {
     enabled: !!currentTrip && !!currentMember,
   })
 
-  // 获取清单列表
-  const { data: checklists, isLoading } = useQuery({
+  const { data: checklists, isLoading } = useQuery<ChecklistItem[]>({
     queryKey: ['checklists', currentTrip?.id, activeCategory, currentMember?.id],
     queryFn: async () => {
       if (!currentTrip) return []
-      let query = supabase
+      const { data, error } = await supabase
         .from('trip_checklists')
         .select('*, completed_by:trip_members!trip_checklists_completed_by_member_id_fkey(display_name), owner:trip_members!trip_checklists_created_by_member_id_fkey(display_name)')
         .eq('trip_id', currentTrip.id)
         .eq('category', activeCategory)
+        .order('created_at', { ascending: true })
 
-      const { data, error } = await query.order('created_at', { ascending: false })
-      
       if (error) throw error
-      return data as any[]
+      return data as unknown as ChecklistItem[]
     },
     enabled: !!currentTrip && (activeCategory === 'public' || !!currentMember),
-    retry: false
+    retry: false,
   })
 
   const sharedMemberIds = new Set((personalShares || []).map((share) => share.shared_member_id))
   const shareableMembers = (members || []).filter((member) => member.id !== currentMember?.id)
+
+  const groups = useMemo(
+    () => (checklists || []).filter((item) => item.item_kind === 'group' && !item.parent_id),
+    [checklists],
+  )
+
+  const childItemsByGroup = useMemo(() => {
+    const map = new Map<string, ChecklistItem[]>()
+    for (const item of checklists || []) {
+      if (item.item_kind === 'group' || !item.parent_id) continue
+      const children = map.get(item.parent_id) || []
+      children.push(item)
+      map.set(item.parent_id, children)
+    }
+    return map
+  }, [checklists])
+
+  const standaloneItems = useMemo(
+    () => (checklists || []).filter((item) => item.item_kind !== 'group' && !item.parent_id),
+    [checklists],
+  )
+
+  const canManageItem = (item: ChecklistItem) => (
+    activeCategory === 'public' || item.created_by_member_id === currentMember?.id
+  )
+
+  const groupOptions = groups.filter(canManageItem)
+
+  const invalidateChecklists = () => {
+    queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
+  }
 
   const handleToggleShare = async (memberId: string) => {
     if (!currentTrip || !currentMember) return
@@ -114,75 +175,238 @@ export default function ChecklistPage() {
     queryClient.invalidateQueries({ queryKey: ['personalChecklistShares', currentTrip.id, currentMember.id] })
   }
 
-  // 添加新清单
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newItemTitle.trim() || !currentTrip) return
     if (activeCategory === 'personal' && !currentMember) {
-      alert("您不在该旅程成员中，无法添加个人清单")
+      alert('您不在该旅程成员中，无法添加个人清单')
       return
     }
-    
+
+    const parentId = newItemKind === 'item' && selectedGroupId !== 'none' ? selectedGroupId : null
+    const parentGroup = parentId ? groups.find((group) => group.id === parentId) : null
+
+    if (parentGroup && !canManageItem(parentGroup)) {
+      alert('您只能在自己可管理的分类下添加项目')
+      return
+    }
+
     const { error } = await supabase.from('trip_checklists').insert({
       trip_id: currentTrip.id,
       title: newItemTitle.trim(),
       category: activeCategory,
-      created_by_member_id: currentMember?.id
+      item_kind: newItemKind,
+      parent_id: parentId,
+      created_by_member_id: currentMember?.id,
     })
-    
+
     if (error) {
       alert(error.message)
     } else {
       setNewItemTitle('')
-      queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip.id, activeCategory] })
+      if (newItemKind === 'group') setSelectedGroupId('none')
+      invalidateChecklists()
     }
   }
 
-  // 切换确认状态
-  const handleToggle = async (item: any) => {
+  const handleToggleGroupCollapsed = (groupId: string) => {
+    setCollapsedGroupIds((current) => {
+      const next = new Set(current)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }
+
+  const handleToggle = async (item: ChecklistItem) => {
     if (!currentMember) {
-      alert("您不在该旅程成员中，无法操作")
+      alert('您不在该旅程成员中，无法操作')
       return
     }
+
     const isCompleted = !item.is_completed
-    const { error } = await supabase.from('trip_checklists').update({
-      is_completed: isCompleted,
-      completed_by_member_id: isCompleted ? currentMember.id : null
-    }).eq('id', item.id)
 
-    if (error) alert(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
+    if (item.item_kind === 'group') {
+      const childIds = (childItemsByGroup.get(item.id) || []).map((child) => child.id)
+      const ids = [item.id, ...childIds]
+      const { error } = await supabase
+        .from('trip_checklists')
+        .update({
+          is_completed: isCompleted,
+          completed_by_member_id: isCompleted ? currentMember.id : null,
+        })
+        .in('id', ids)
+
+      if (error) alert(error.message)
+      else invalidateChecklists()
+      return
+    }
+
+    const { error } = await supabase
+      .from('trip_checklists')
+      .update({
+        is_completed: isCompleted,
+        completed_by_member_id: isCompleted ? currentMember.id : null,
+      })
+      .eq('id', item.id)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    if (item.parent_id) {
+      const siblings = childItemsByGroup.get(item.parent_id) || []
+      const allChildrenCompleted = siblings.length > 0 && siblings.every((sibling) => (
+        sibling.id === item.id ? isCompleted : !!sibling.is_completed
+      ))
+
+      await supabase
+        .from('trip_checklists')
+        .update({
+          is_completed: allChildrenCompleted,
+          completed_by_member_id: allChildrenCompleted ? currentMember.id : null,
+        })
+        .eq('id', item.parent_id)
+    }
+
+    invalidateChecklists()
   }
 
-  // 删除清单
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('确认删除此项吗？')) return
-    const { error } = await supabase.from('trip_checklists').delete().eq('id', id)
+  const handleDelete = async (item: ChecklistItem) => {
+    const message = item.item_kind === 'group'
+      ? '确认删除此分类及其下面的所有清单吗？'
+      : '确认删除此项吗？'
+    if (!window.confirm(message)) return
+
+    const { error } = await supabase.from('trip_checklists').delete().eq('id', item.id)
     if (error) alert(error.message)
-    else queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
+    else invalidateChecklists()
   }
 
-  // 启动编辑
-  const startEdit = (item: any) => {
+  const startEdit = (item: ChecklistItem) => {
     setEditingId(item.id)
     setEditTitle(item.title)
   }
 
-  // 保存编辑
   const handleSaveEdit = async (id: string) => {
     if (!editTitle.trim()) {
       setEditingId(null)
       return
     }
     const { error } = await supabase.from('trip_checklists').update({
-      title: editTitle.trim()
+      title: editTitle.trim(),
     }).eq('id', id)
 
     if (error) alert(error.message)
     else {
       setEditingId(null)
-      queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
+      invalidateChecklists()
     }
+  }
+
+  const renderChecklistRow = (item: ChecklistItem, options?: { isChild?: boolean; childCount?: number }) => {
+    const isGroup = item.item_kind === 'group'
+    const isChild = !!options?.isChild
+    const canManage = canManageItem(item)
+
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, x: -20 }}
+        key={item.id}
+        className={`glass-card border transition-all duration-300 flex items-center gap-3 sm:gap-4 group shadow-md ${
+          isChild ? 'p-3.5 sm:p-4 rounded-[20px] ml-7 sm:ml-10' : 'p-4 sm:p-5 rounded-[24px]'
+        } ${
+          item.is_completed ? 'bg-black/10 backdrop-blur-sm border-white/5 opacity-70' : 'bg-black/30 backdrop-blur-md border-white/20 hover:border-white/30'
+        }`}
+      >
+        {isGroup && (
+          <button
+            type="button"
+            onClick={() => handleToggleGroupCollapsed(item.id)}
+            className="shrink-0 p-1 text-white/50 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+            aria-label={collapsedGroupIds.has(item.id) ? '展开分类' : '折叠分类'}
+          >
+            <ChevronDown className={`w-5 h-5 transition-transform ${collapsedGroupIds.has(item.id) ? '-rotate-90' : ''}`} />
+          </button>
+        )}
+
+        <button
+          onClick={() => handleToggle(item)}
+          className="shrink-0 focus:outline-none"
+          aria-label={item.is_completed ? '取消勾选' : '勾选'}
+        >
+          {item.is_completed ? (
+            <CheckCircle2 className="w-7 h-7 text-white/80" />
+          ) : (
+            <Circle className="w-7 h-7 text-white/20 group-hover:text-white/40 transition-colors" />
+          )}
+        </button>
+
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          {editingId === item.id ? (
+            <input
+              type="text"
+              autoFocus
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={() => handleSaveEdit(item.id)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
+              className="flex-1 bg-black/40 border border-[#0A84FF]/50 rounded-xl px-3 py-2 text-white focus:outline-none font-medium"
+            />
+          ) : (
+            <div className="flex-1 min-w-0">
+              <span className={`block truncate transition-all ${
+                isGroup ? 'text-lg font-black' : 'text-base sm:text-lg font-medium'
+              } ${item.is_completed ? 'text-white/40 line-through' : 'text-white'}`}>
+                {item.title}
+              </span>
+              {isGroup && (
+                <span className="block text-[11px] font-bold text-white/45 mt-1">
+                  {options?.childCount || 0} 个项目
+                </span>
+              )}
+            </div>
+          )}
+
+          {item.is_completed && item.completed_by && (
+            <span className="shrink-0 text-[10px] font-black bg-emerald-500/80 text-white px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-400/30 shadow-md drop-shadow-sm">
+              {item.completed_by.display_name}
+            </span>
+          )}
+
+          {activeCategory === 'personal' && item.created_by_member_id !== currentMember?.id && item.owner && (
+            <span className="shrink-0 text-[10px] font-black bg-white/10 text-white/70 px-3 py-1 rounded-full uppercase tracking-widest border border-white/10 shadow-md drop-shadow-sm">
+              来自 {item.owner.display_name}
+            </span>
+          )}
+        </div>
+
+        {canManage && (
+          <div className="shrink-0 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            {editingId !== item.id && (
+              <button
+                onClick={() => startEdit(item)}
+                className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                aria-label="编辑"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => handleDelete(item)}
+              className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
+              aria-label="删除"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </motion.div>
+    )
   }
 
   return (
@@ -197,15 +421,12 @@ export default function ChecklistPage() {
         <p className="text-white/80 font-medium mt-2 drop-shadow-sm">打点好一切，开启无忧旅程。</p>
       </header>
 
-      {/* 分类切换器 */}
       <div className="flex p-1.5 bg-black/20 backdrop-blur-md rounded-[22px] mb-8 w-fit mx-auto border border-white/10 shadow-lg overflow-hidden relative">
         <motion.div
           className="absolute left-1.5 inset-y-1.5 bg-white rounded-[16px] shadow-xl"
           initial={false}
-          animate={{
-            x: activeCategory === 'public' ? 0 : '100%',
-          }}
-          transition={{ type: "spring", stiffness: 350, damping: 35 }}
+          animate={{ x: activeCategory === 'public' ? 0 : '100%' }}
+          transition={{ type: 'spring', stiffness: 350, damping: 35 }}
           style={{ width: 'calc(50% - 6px)' }}
         />
         <button
@@ -228,25 +449,62 @@ export default function ChecklistPage() {
         </button>
       </div>
 
-      {/* 添加表单 */}
-      <form onSubmit={handleAdd} className="mb-8 relative group">
-        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-          <ListTodo className="h-5 w-5 text-white/40" />
+      <form onSubmit={handleAdd} className="mb-8 glass-card p-3 sm:p-4 rounded-[28px] border border-white/10 shadow-lg">
+        <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto_auto] gap-3 items-center">
+          <div className="flex p-1 bg-black/25 rounded-2xl border border-white/10">
+            <button
+              type="button"
+              onClick={() => setNewItemKind('item')}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${newItemKind === 'item' ? 'bg-white text-black' : 'text-white/60 hover:text-white'}`}
+            >
+              项目
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setNewItemKind('group')
+                setSelectedGroupId('none')
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${newItemKind === 'group' ? 'bg-white text-black' : 'text-white/60 hover:text-white'}`}
+            >
+              分类
+            </button>
+          </div>
+
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              {newItemKind === 'group' ? <FolderPlus className="h-5 w-5 text-white/40" /> : <ListTodo className="h-5 w-5 text-white/40" />}
+            </div>
+            <input
+              type="text"
+              value={newItemTitle}
+              onChange={(e) => setNewItemTitle(e.target.value)}
+              placeholder={newItemKind === 'group' ? '添加自定义分类，例如：药物...' : '添加准备事项，例如：感冒药...'}
+              className="w-full bg-black/20 border border-white/20 hover:border-white/30 focus:border-white/50 rounded-2xl pl-12 pr-4 py-3.5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60"
+            />
+          </div>
+
+          <select
+            value={selectedGroupId}
+            onChange={(e) => setSelectedGroupId(e.target.value)}
+            disabled={newItemKind === 'group' || groupOptions.length === 0}
+            className="bg-black/25 border border-white/15 rounded-2xl px-4 py-3.5 text-sm font-bold text-white focus:outline-none disabled:opacity-45"
+          >
+            <option value="none">不分类</option>
+            {groupOptions.map((group) => (
+              <option key={group.id} value={group.id}>{group.title}</option>
+            ))}
+          </select>
+
+          <button
+            type="submit"
+            disabled={!newItemTitle.trim()}
+            className="h-12 px-5 rounded-2xl flex items-center justify-center gap-2 bg-white text-black disabled:bg-white/10 disabled:text-white/30 font-black text-sm transition-all active:scale-95"
+          >
+            <Plus className="w-4 h-4" />
+            添加
+          </button>
         </div>
-        <input
-          type="text"
-          value={newItemTitle}
-          onChange={(e) => setNewItemTitle(e.target.value)}
-          placeholder="添加一个新的待办/准备事项..."
-          className="w-full bg-black/20 backdrop-blur-md border border-white/20 hover:border-white/30 focus:border-white/50 rounded-3xl pl-14 pr-16 py-5 text-white focus:outline-none transition-all font-bold placeholder:text-white/60 shadow-lg"
-        />
-        <button
-          type="submit"
-          disabled={!newItemTitle.trim()}
-          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-2xl flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-0 disabled:pointer-events-none transition-all active:scale-95"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
       </form>
 
       {activeCategory === 'personal' && currentMember && (
@@ -297,101 +555,26 @@ export default function ChecklistPage() {
         </div>
       )}
 
-      {/* 列表内容 */}
       {isLoading ? (
         <div className="flex items-center justify-center py-32">
           <Loader2 className="w-10 h-10 animate-spin text-white/10" />
         </div>
       ) : checklists && checklists.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <AnimatePresence mode="popLayout">
-            {checklists.map((item) => (
-              (() => {
-                const isOwnPersonalItem = activeCategory === 'personal' && item.created_by_member_id === currentMember?.id
-                const canManageItem = activeCategory === 'public' || isOwnPersonalItem
-
-                return (
-              <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, x: -20 }}
-                key={item.id}
-                className={`glass-card p-4 sm:p-5 rounded-[24px] border transition-all duration-300 flex items-center gap-4 group shadow-md ${
-                  item.is_completed ? 'bg-black/10 backdrop-blur-sm border-white/5 opacity-70' : 'bg-black/30 backdrop-blur-md border-white/20 hover:border-white/30'
-                }`}
-              >
-                {/* Checkbox */}
-                <button
-                  onClick={() => handleToggle(item)}
-                  className="shrink-0 focus:outline-none"
-                >
-                  {item.is_completed ? (
-                    <CheckCircle2 className="w-7 h-7 text-white/80" />
-                  ) : (
-                    <Circle className="w-7 h-7 text-white/20 group-hover:text-white/40 transition-colors" />
-                  )}
-                </button>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0 flex items-center gap-3">
-                  {editingId === item.id ? (
-                    <input
-                      type="text"
-                      autoFocus
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      onBlur={() => handleSaveEdit(item.id)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(item.id)}
-                      className="flex-1 bg-black/40 border border-[#0A84FF]/50 rounded-xl px-3 py-2 text-white focus:outline-none font-medium"
-                    />
-                  ) : (
-                    <div className="flex-1 min-w-0">
-                      <span className={`block font-medium truncate text-lg transition-all ${
-                        item.is_completed ? 'text-white/40 line-through' : 'text-white'
-                      }`}>
-                        {item.title}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* 确认人标签 */}
-                  {item.is_completed && item.completed_by && (
-                    <span className="shrink-0 text-[10px] font-black bg-emerald-500/80 text-white px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-400/30 shadow-md drop-shadow-sm">
-                      {item.completed_by.display_name}
-                    </span>
-                  )}
-
-                  {activeCategory === 'personal' && !isOwnPersonalItem && item.owner && (
-                    <span className="shrink-0 text-[10px] font-black bg-white/10 text-white/70 px-3 py-1 rounded-full uppercase tracking-widest border border-white/10 shadow-md drop-shadow-sm">
-                      来自 {item.owner.display_name}
-                    </span>
-                  )}
+            {groups.map((group) => {
+              const children = childItemsByGroup.get(group.id) || []
+              const isCollapsed = collapsedGroupIds.has(group.id)
+              return (
+                <div key={group.id} className="space-y-2">
+                  {renderChecklistRow(group, { childCount: children.length })}
+                  <AnimatePresence initial={false}>
+                    {!isCollapsed && children.map((child) => renderChecklistRow(child, { isChild: true }))}
+                  </AnimatePresence>
                 </div>
-
-                {/* Actions */}
-                {canManageItem && (
-                  <div className="shrink-0 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    {editingId !== item.id && (
-                      <button
-                        onClick={() => startEdit(item)}
-                        className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-2 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-                )
-              })()
-            ))}
+              )
+            })}
+            {standaloneItems.map((item) => renderChecklistRow(item))}
           </AnimatePresence>
         </div>
       ) : (
@@ -403,8 +586,8 @@ export default function ChecklistPage() {
             {activeCategory === 'public' ? '一切准备就绪？' : '准备好出发了？'}
           </h3>
           <p className="text-white/80 font-medium text-sm drop-shadow-sm">
-            {activeCategory === 'public' 
-              ? '开始添加你们的行前待办清单吧。' 
+            {activeCategory === 'public'
+              ? '开始添加你们的行前待办清单吧。'
               : '记录下个人准备事项，也可以共享给室友或同行伙伴。'}
           </p>
         </div>

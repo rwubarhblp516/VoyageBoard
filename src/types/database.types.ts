@@ -147,6 +147,8 @@ export type Database = {
           created_by_member_id: string | null
           id: string
           is_completed: boolean | null
+          item_kind: string
+          parent_id: string | null
           title: string
           trip_id: string
         }
@@ -157,6 +159,8 @@ export type Database = {
           created_by_member_id?: string | null
           id?: string
           is_completed?: boolean | null
+          item_kind?: string
+          parent_id?: string | null
           title: string
           trip_id: string
         }
@@ -167,6 +171,8 @@ export type Database = {
           created_by_member_id?: string | null
           id?: string
           is_completed?: boolean | null
+          item_kind?: string
+          parent_id?: string | null
           title?: string
           trip_id?: string
         }
@@ -176,6 +182,13 @@ export type Database = {
             columns: ["completed_by_member_id"]
             isOneToOne: false
             referencedRelation: "trip_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_checklists_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "trip_checklists"
             referencedColumns: ["id"]
           },
           {

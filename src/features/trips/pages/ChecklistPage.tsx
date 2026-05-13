@@ -158,6 +158,41 @@ export default function ChecklistPage() {
     queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
   }
 
+  const updateChecklistCache = (updater: (items: ChecklistItem[]) => ChecklistItem[]) => {
+    queryClient.setQueriesData<ChecklistItem[]>(
+      { queryKey: ['checklists', currentTrip?.id, activeCategory] },
+      (current) => current ? updater(current) : current,
+    )
+  }
+
+  const buildCurrentMemberConfirmation = (checklistId: string): ChecklistConfirmation => ({
+    id: `optimistic-${currentMember?.id}-${checklistId}`,
+    trip_id: currentTrip!.id,
+    checklist_id: checklistId,
+    member_id: currentMember!.id,
+    confirmed_at: new Date().toISOString(),
+    member: {
+      display_name: members?.find((member) => member.id === currentMember?.id)?.display_name || '我',
+      avatar_url: members?.find((member) => member.id === currentMember?.id)?.avatar_url || null,
+    },
+  })
+
+  const setCurrentMemberConfirmations = (checklistIds: string[], shouldConfirm: boolean) => {
+    const idSet = new Set(checklistIds)
+    updateChecklistCache((items) => items.map((item) => {
+      if (!idSet.has(item.id)) return item
+
+      const existingConfirmations = item.confirmations || []
+      const withoutCurrentMember = existingConfirmations.filter((confirmation) => confirmation.member_id !== currentMember?.id)
+      return {
+        ...item,
+        confirmations: shouldConfirm
+          ? [...withoutCurrentMember, buildCurrentMemberConfirmation(item.id)]
+          : withoutCurrentMember,
+      }
+    }))
+  }
+
   const handleToggleShare = async (memberId: string) => {
     if (!currentTrip || !currentMember) return
 
@@ -272,6 +307,8 @@ export default function ChecklistPage() {
           .map((child) => child.id),
       ])
       const shouldConfirm = ids.some((id) => !currentConfirmedIds.has(id))
+      setCurrentMemberConfirmations(ids, shouldConfirm)
+
       const request = shouldConfirm
         ? supabase
             .from('trip_checklist_confirmations')
@@ -290,12 +327,18 @@ export default function ChecklistPage() {
             .eq('member_id', currentMember.id)
 
       const { error } = await request
-      if (error) alert(error.message)
-      else invalidateChecklists()
+      if (error) {
+        setCurrentMemberConfirmations(ids, !shouldConfirm)
+        alert(error.message)
+      } else {
+        invalidateChecklists()
+      }
       return
     }
 
     const confirmedByCurrentMember = (item.confirmations || []).some((confirmation) => confirmation.member_id === currentMember.id)
+    setCurrentMemberConfirmations([item.id], !confirmedByCurrentMember)
+
     const request = confirmedByCurrentMember
       ? supabase
           .from('trip_checklist_confirmations')
@@ -304,14 +347,15 @@ export default function ChecklistPage() {
           .eq('member_id', currentMember.id)
       : supabase
           .from('trip_checklist_confirmations')
-          .insert({
+          .upsert({
             trip_id: currentTrip!.id,
             checklist_id: item.id,
             member_id: currentMember.id,
-          })
+          }, { onConflict: 'checklist_id,member_id' })
 
     const { error } = await request
     if (error) {
+      setCurrentMemberConfirmations([item.id], confirmedByCurrentMember)
       alert(error.message)
       return
     }

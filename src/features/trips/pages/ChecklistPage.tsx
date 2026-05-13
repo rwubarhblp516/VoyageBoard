@@ -133,14 +133,17 @@ export default function ChecklistPage() {
     [checklists],
   )
 
-  const isConfirmedByCurrentMember = (item: ChecklistItem) => (
+  const isDirectlyConfirmedByCurrentMember = (item: ChecklistItem) => (
     (item.confirmations || []).some((confirmation) => confirmation.member_id === currentMember?.id)
   )
 
-  const sortForCurrentMember = (items: ChecklistItem[]) => (
+  const sortForCurrentMember = (
+    items: ChecklistItem[],
+    isConfirmed: (item: ChecklistItem) => boolean = isDirectlyConfirmedByCurrentMember,
+  ) => (
     [...items].sort((a, b) => {
-      const aConfirmed = isConfirmedByCurrentMember(a)
-      const bConfirmed = isConfirmedByCurrentMember(b)
+      const aConfirmed = isConfirmed(a)
+      const bConfirmed = isConfirmed(b)
       if (aConfirmed !== bConfirmed) return aConfirmed ? 1 : -1
       return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
     })
@@ -160,19 +163,57 @@ export default function ChecklistPage() {
     return map
   }, [checklists, currentMember?.id])
 
+  const getEffectiveConfirmations = (item: ChecklistItem): ChecklistConfirmation[] => {
+    const directConfirmations = item.confirmations || []
+    if (item.item_kind !== 'group') return directConfirmations
+
+    const children = childItemsByGroup.get(item.id) || []
+    if (children.length === 0) return directConfirmations
+
+    const directMemberIds = new Set(directConfirmations.map((confirmation) => confirmation.member_id))
+    const derivedConfirmations = (members || [])
+      .filter((member) => !directMemberIds.has(member.id))
+      .filter((member) => children.every((child) => (
+        (child.confirmations || []).some((confirmation) => confirmation.member_id === member.id)
+      )))
+      .map((member) => ({
+        id: `derived-${item.id}-${member.id}`,
+        trip_id: item.trip_id,
+        checklist_id: item.id,
+        member_id: member.id,
+        confirmed_at: null,
+        member: {
+          display_name: member.display_name,
+          avatar_url: member.avatar_url,
+        },
+      }))
+
+    return [...directConfirmations, ...derivedConfirmations]
+  }
+
+  const isEffectivelyConfirmedByCurrentMember = (item: ChecklistItem) => (
+    getEffectiveConfirmations(item).some((confirmation) => confirmation.member_id === currentMember?.id)
+  )
+
   const standaloneItems = useMemo(
     () => (checklists || []).filter((item) => item.item_kind !== 'group' && !item.parent_id),
     [checklists],
   )
 
   const ownGroups = useMemo(
-    () => sortForCurrentMember(groups.filter((item) => activeCategory !== 'personal' || item.created_by_member_id === currentMember?.id)),
-    [activeCategory, currentMember?.id, groups],
+    () => sortForCurrentMember(
+      groups.filter((item) => activeCategory !== 'personal' || item.created_by_member_id === currentMember?.id),
+      isEffectivelyConfirmedByCurrentMember,
+    ),
+    [activeCategory, childItemsByGroup, currentMember?.id, groups, members],
   )
 
   const sharedGroups = useMemo(
-    () => sortForCurrentMember(groups.filter((item) => activeCategory === 'personal' && item.created_by_member_id !== currentMember?.id)),
-    [activeCategory, currentMember?.id, groups],
+    () => sortForCurrentMember(
+      groups.filter((item) => activeCategory === 'personal' && item.created_by_member_id !== currentMember?.id),
+      isEffectivelyConfirmedByCurrentMember,
+    ),
+    [activeCategory, childItemsByGroup, currentMember?.id, groups, members],
   )
 
   const ownStandaloneItems = useMemo(
@@ -346,46 +387,50 @@ export default function ChecklistPage() {
     }
 
     if (item.item_kind === 'group') {
-      const childIds = (childItemsByGroup.get(item.id) || []).map((child) => child.id)
+      const children = childItemsByGroup.get(item.id) || []
+      const childIds = children.map((child) => child.id)
       const ids = [item.id, ...childIds]
       if (ids.some((id) => pendingToggleIds.has(id))) return
 
-      const currentConfirmedIds = new Set([
-        ...(item.confirmations || []).filter((confirmation) => confirmation.member_id === currentMember.id).map(() => item.id),
-        ...(childItemsByGroup.get(item.id) || [])
-          .filter((child) => (child.confirmations || []).some((confirmation) => confirmation.member_id === currentMember.id))
-          .map((child) => child.id),
-      ])
-      const shouldConfirm = ids.some((id) => !currentConfirmedIds.has(id))
+      const shouldConfirm = !isEffectivelyConfirmedByCurrentMember(item)
       setCurrentMemberConfirmations(ids, shouldConfirm)
       setTogglePending(ids, true)
 
-      const request = shouldConfirm
-        ? supabase
-            .from('trip_checklist_confirmations')
-            .upsert(
-              ids.map((id) => ({
-                trip_id: currentTrip!.id,
-                checklist_id: id,
-                member_id: currentMember.id,
-              })),
-              { onConflict: 'checklist_id,member_id', ignoreDuplicates: true },
-            )
-        : supabase
+      let error: { message: string } | null = null
+
+      if (shouldConfirm) {
+        const response = await supabase
+          .from('trip_checklist_confirmations')
+          .upsert(
+            ids.map((id) => ({
+              trip_id: currentTrip!.id,
+              checklist_id: id,
+              member_id: currentMember.id,
+            })),
+            { onConflict: 'checklist_id,member_id', ignoreDuplicates: true },
+          )
+        error = response.error
+      } else {
+        const confirmationIds = [
+          ...(item.confirmations || [])
+            .filter((confirmation) => confirmation.member_id === currentMember.id)
+            .map((confirmation) => confirmation.id),
+          ...children.flatMap((child) => (
+            (child.confirmations || [])
+              .filter((confirmation) => confirmation.member_id === currentMember.id)
+              .map((confirmation) => confirmation.id)
+          )),
+        ].filter((id) => !id.startsWith('optimistic-') && !id.startsWith('derived-'))
+
+        if (confirmationIds.length > 0) {
+          const response = await supabase
             .from('trip_checklist_confirmations')
             .delete()
-            .in('id', [
-              ...(item.confirmations || [])
-                .filter((confirmation) => confirmation.member_id === currentMember.id)
-                .map((confirmation) => confirmation.id),
-              ...(childItemsByGroup.get(item.id) || []).flatMap((child) => (
-                (child.confirmations || [])
-                  .filter((confirmation) => confirmation.member_id === currentMember.id)
-                  .map((confirmation) => confirmation.id)
-              )),
-            ].filter((id) => !id.startsWith('optimistic-')))
+            .in('id', confirmationIds)
+          error = response.error
+        }
+      }
 
-      const { error } = await request
       if (error) {
         setCurrentMemberConfirmations(ids, !shouldConfirm)
         alert(error.message)
@@ -463,7 +508,7 @@ export default function ChecklistPage() {
     const isGroup = item.item_kind === 'group'
     const isChild = !!options?.isChild
     const canManage = canManageItem(item)
-    const confirmations = item.confirmations || []
+    const confirmations = getEffectiveConfirmations(item)
     const confirmedByCurrentMember = confirmations.some((confirmation) => confirmation.member_id === currentMember?.id)
     const isCompletedForDisplay = confirmations.length > 0 || !!item.is_completed
     const isTogglePending = pendingToggleIds.has(item.id)

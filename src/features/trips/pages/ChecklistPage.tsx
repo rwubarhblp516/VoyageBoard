@@ -60,6 +60,7 @@ export default function ChecklistPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(new Set())
+  const [pendingToggleIds, setPendingToggleIds] = useState<Set<string>>(new Set())
 
   const { data: currentMember } = useQuery({
     queryKey: ['currentMember', currentTrip?.id, user?.id],
@@ -155,7 +156,7 @@ export default function ChecklistPage() {
   const groupOptions = groups.filter(canManageItem)
 
   const invalidateChecklists = () => {
-    queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
+    return queryClient.invalidateQueries({ queryKey: ['checklists', currentTrip?.id, activeCategory] })
   }
 
   const updateChecklistCache = (updater: (items: ChecklistItem[]) => ChecklistItem[]) => {
@@ -191,6 +192,17 @@ export default function ChecklistPage() {
           : withoutCurrentMember,
       }
     }))
+  }
+
+  const setTogglePending = (checklistIds: string[], isPending: boolean) => {
+    setPendingToggleIds((current) => {
+      const next = new Set(current)
+      for (const id of checklistIds) {
+        if (isPending) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
   }
 
   const handleToggleShare = async (memberId: string) => {
@@ -300,6 +312,8 @@ export default function ChecklistPage() {
     if (item.item_kind === 'group') {
       const childIds = (childItemsByGroup.get(item.id) || []).map((child) => child.id)
       const ids = [item.id, ...childIds]
+      if (ids.some((id) => pendingToggleIds.has(id))) return
+
       const currentConfirmedIds = new Set([
         ...(item.confirmations || []).filter((confirmation) => confirmation.member_id === currentMember.id).map(() => item.id),
         ...(childItemsByGroup.get(item.id) || [])
@@ -308,6 +322,7 @@ export default function ChecklistPage() {
       ])
       const shouldConfirm = ids.some((id) => !currentConfirmedIds.has(id))
       setCurrentMemberConfirmations(ids, shouldConfirm)
+      setTogglePending(ids, true)
 
       const request = shouldConfirm
         ? supabase
@@ -323,28 +338,40 @@ export default function ChecklistPage() {
         : supabase
             .from('trip_checklist_confirmations')
             .delete()
-            .in('checklist_id', ids)
-            .eq('member_id', currentMember.id)
+            .in('id', [
+              ...(item.confirmations || [])
+                .filter((confirmation) => confirmation.member_id === currentMember.id)
+                .map((confirmation) => confirmation.id),
+              ...(childItemsByGroup.get(item.id) || []).flatMap((child) => (
+                (child.confirmations || [])
+                  .filter((confirmation) => confirmation.member_id === currentMember.id)
+                  .map((confirmation) => confirmation.id)
+              )),
+            ].filter((id) => !id.startsWith('optimistic-')))
 
       const { error } = await request
       if (error) {
         setCurrentMemberConfirmations(ids, !shouldConfirm)
         alert(error.message)
       } else {
-        invalidateChecklists()
+        await invalidateChecklists()
       }
+      setTogglePending(ids, false)
       return
     }
 
+    if (pendingToggleIds.has(item.id)) return
+
     const confirmedByCurrentMember = (item.confirmations || []).some((confirmation) => confirmation.member_id === currentMember.id)
+    const currentConfirmation = (item.confirmations || []).find((confirmation) => confirmation.member_id === currentMember.id)
     setCurrentMemberConfirmations([item.id], !confirmedByCurrentMember)
+    setTogglePending([item.id], true)
 
     const request = confirmedByCurrentMember
       ? supabase
           .from('trip_checklist_confirmations')
           .delete()
-          .eq('checklist_id', item.id)
-          .eq('member_id', currentMember.id)
+          .eq('id', currentConfirmation?.id || '')
       : supabase
           .from('trip_checklist_confirmations')
           .upsert({
@@ -357,10 +384,11 @@ export default function ChecklistPage() {
     if (error) {
       setCurrentMemberConfirmations([item.id], confirmedByCurrentMember)
       alert(error.message)
-      return
+    } else {
+      await invalidateChecklists()
     }
 
-    invalidateChecklists()
+    setTogglePending([item.id], false)
   }
 
   const handleDelete = async (item: ChecklistItem) => {
@@ -402,6 +430,7 @@ export default function ChecklistPage() {
     const confirmations = item.confirmations || []
     const confirmedByCurrentMember = confirmations.some((confirmation) => confirmation.member_id === currentMember?.id)
     const isCompletedForDisplay = confirmations.length > 0 || !!item.is_completed
+    const isTogglePending = pendingToggleIds.has(item.id)
 
     return (
       <motion.div
@@ -429,7 +458,8 @@ export default function ChecklistPage() {
 
         <button
           onClick={() => handleToggle(item)}
-          className="shrink-0 focus:outline-none"
+          disabled={isTogglePending}
+          className="shrink-0 focus:outline-none disabled:opacity-45 disabled:cursor-wait"
           aria-label={confirmedByCurrentMember ? '取消我的确认' : '确认我已准备'}
         >
           {confirmedByCurrentMember ? (

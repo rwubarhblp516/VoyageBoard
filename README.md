@@ -91,6 +91,7 @@ Notes:
 - The migration `20260513062000_refine_timeline_permissions.sql` adds guide inclusion flags and limits itinerary deletion to the author or trip owner.
 - The migration `20260513070000_timeline_entry_images.sql` adds compressed WebP image attachments for timeline entries through the `trip-images` storage bucket.
 - The migration `20260513076000_checklist_member_confirmations.sql` adds per-member checklist confirmations so every member can see who confirmed each item.
+- The migration `20260513082000_allow_update_own_checklist_confirmations.sql` allows idempotent updates for a member's own checklist confirmations.
 - Keep database changes in timestamped SQL files under `supabase/migrations`.
 
 ## Cloudflare Pages Deployment

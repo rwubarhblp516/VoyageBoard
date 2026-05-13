@@ -333,7 +333,7 @@ export default function ChecklistPage() {
                 checklist_id: id,
                 member_id: currentMember.id,
               })),
-              { onConflict: 'checklist_id,member_id' },
+              { onConflict: 'checklist_id,member_id', ignoreDuplicates: true },
             )
         : supabase
             .from('trip_checklist_confirmations')
@@ -378,7 +378,7 @@ export default function ChecklistPage() {
             trip_id: currentTrip!.id,
             checklist_id: item.id,
             member_id: currentMember.id,
-          }, { onConflict: 'checklist_id,member_id' })
+          }, { onConflict: 'checklist_id,member_id', ignoreDuplicates: true })
 
     const { error } = await request
     if (error) {

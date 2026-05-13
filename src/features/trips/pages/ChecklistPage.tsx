@@ -133,6 +133,19 @@ export default function ChecklistPage() {
     [checklists],
   )
 
+  const isConfirmedByCurrentMember = (item: ChecklistItem) => (
+    (item.confirmations || []).some((confirmation) => confirmation.member_id === currentMember?.id)
+  )
+
+  const sortForCurrentMember = (items: ChecklistItem[]) => (
+    [...items].sort((a, b) => {
+      const aConfirmed = isConfirmedByCurrentMember(a)
+      const bConfirmed = isConfirmedByCurrentMember(b)
+      if (aConfirmed !== bConfirmed) return aConfirmed ? 1 : -1
+      return new Date(a.created_at || '').getTime() - new Date(b.created_at || '').getTime()
+    })
+  )
+
   const childItemsByGroup = useMemo(() => {
     const map = new Map<string, ChecklistItem[]>()
     for (const item of checklists || []) {
@@ -141,12 +154,35 @@ export default function ChecklistPage() {
       children.push(item)
       map.set(item.parent_id, children)
     }
+    for (const [groupId, children] of map.entries()) {
+      map.set(groupId, sortForCurrentMember(children))
+    }
     return map
-  }, [checklists])
+  }, [checklists, currentMember?.id])
 
   const standaloneItems = useMemo(
     () => (checklists || []).filter((item) => item.item_kind !== 'group' && !item.parent_id),
     [checklists],
+  )
+
+  const ownGroups = useMemo(
+    () => sortForCurrentMember(groups.filter((item) => activeCategory !== 'personal' || item.created_by_member_id === currentMember?.id)),
+    [activeCategory, currentMember?.id, groups],
+  )
+
+  const sharedGroups = useMemo(
+    () => sortForCurrentMember(groups.filter((item) => activeCategory === 'personal' && item.created_by_member_id !== currentMember?.id)),
+    [activeCategory, currentMember?.id, groups],
+  )
+
+  const ownStandaloneItems = useMemo(
+    () => sortForCurrentMember(standaloneItems.filter((item) => activeCategory !== 'personal' || item.created_by_member_id === currentMember?.id)),
+    [activeCategory, currentMember?.id, standaloneItems],
+  )
+
+  const sharedStandaloneItems = useMemo(
+    () => sortForCurrentMember(standaloneItems.filter((item) => activeCategory === 'personal' && item.created_by_member_id !== currentMember?.id)),
+    [activeCategory, currentMember?.id, standaloneItems],
   )
 
   const canManageItem = (item: ChecklistItem) => (
@@ -543,6 +579,27 @@ export default function ChecklistPage() {
     )
   }
 
+  const renderChecklistSection = (sectionGroups: ChecklistItem[], sectionStandaloneItems: ChecklistItem[]) => (
+    <AnimatePresence mode="popLayout">
+      {sectionGroups.map((group) => {
+        const children = childItemsByGroup.get(group.id) || []
+        const isCollapsed = collapsedGroupIds.has(group.id)
+        return (
+          <div key={group.id} className="space-y-2">
+            {renderChecklistRow(group, { childCount: children.length })}
+            <AnimatePresence initial={false}>
+              {!isCollapsed && children.map((child) => renderChecklistRow(child, { isChild: true }))}
+            </AnimatePresence>
+          </div>
+        )
+      })}
+      {sectionStandaloneItems.map((item) => renderChecklistRow(item))}
+    </AnimatePresence>
+  )
+
+  const hasOwnItems = ownGroups.length > 0 || ownStandaloneItems.length > 0
+  const hasSharedItems = sharedGroups.length > 0 || sharedStandaloneItems.length > 0
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
       <header className="mb-10 flex flex-col items-center text-center">
@@ -731,22 +788,26 @@ export default function ChecklistPage() {
           <Loader2 className="w-10 h-10 animate-spin text-white/10" />
         </div>
       ) : checklists && checklists.length > 0 ? (
-        <div className="space-y-4">
-          <AnimatePresence mode="popLayout">
-            {groups.map((group) => {
-              const children = childItemsByGroup.get(group.id) || []
-              const isCollapsed = collapsedGroupIds.has(group.id)
-              return (
-                <div key={group.id} className="space-y-2">
-                  {renderChecklistRow(group, { childCount: children.length })}
-                  <AnimatePresence initial={false}>
-                    {!isCollapsed && children.map((child) => renderChecklistRow(child, { isChild: true }))}
-                  </AnimatePresence>
+        <div className="space-y-8">
+          {hasOwnItems && (
+            <div className="space-y-4">
+              {renderChecklistSection(ownGroups, ownStandaloneItems)}
+            </div>
+          )}
+
+          {activeCategory === 'personal' && hasSharedItems && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/10" />
+                <div className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/45">Shared With You</p>
+                  <p className="text-xs font-bold text-white/70 mt-0.5">下面是他人分享给你的个人清单</p>
                 </div>
-              )
-            })}
-            {standaloneItems.map((item) => renderChecklistRow(item))}
-          </AnimatePresence>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+              {renderChecklistSection(sharedGroups, sharedStandaloneItems)}
+            </section>
+          )}
         </div>
       ) : (
         <div className="text-center py-32 bg-black/15 backdrop-blur-xl rounded-[40px] border-dashed border-2 border-white/20 shadow-lg">

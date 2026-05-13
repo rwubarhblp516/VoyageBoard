@@ -35,6 +35,16 @@ type ChecklistItem = {
   created_at: string | null
   completed_by?: { display_name: string } | null
   owner?: { display_name: string } | null
+  confirmations?: ChecklistConfirmation[]
+}
+
+type ChecklistConfirmation = {
+  id: string
+  trip_id: string
+  checklist_id: string
+  member_id: string
+  confirmed_at: string | null
+  member?: { display_name: string; avatar_url: string | null } | null
 }
 
 export default function ChecklistPage() {
@@ -102,7 +112,7 @@ export default function ChecklistPage() {
       if (!currentTrip) return []
       const { data, error } = await supabase
         .from('trip_checklists')
-        .select('*, completed_by:trip_members!trip_checklists_completed_by_member_id_fkey(display_name), owner:trip_members!trip_checklists_created_by_member_id_fkey(display_name)')
+        .select('*, completed_by:trip_members!trip_checklists_completed_by_member_id_fkey(display_name), owner:trip_members!trip_checklists_created_by_member_id_fkey(display_name), confirmations:trip_checklist_confirmations(id, trip_id, checklist_id, member_id, confirmed_at, member:trip_members!trip_checklist_confirmations_member_id_fkey(display_name, avatar_url))')
         .eq('trip_id', currentTrip.id)
         .eq('category', activeCategory)
         .order('created_at', { ascending: true })
@@ -252,50 +262,58 @@ export default function ChecklistPage() {
       return
     }
 
-    const isCompleted = !item.is_completed
-
     if (item.item_kind === 'group') {
       const childIds = (childItemsByGroup.get(item.id) || []).map((child) => child.id)
       const ids = [item.id, ...childIds]
-      const { error } = await supabase
-        .from('trip_checklists')
-        .update({
-          is_completed: isCompleted,
-          completed_by_member_id: isCompleted ? currentMember.id : null,
-        })
-        .in('id', ids)
+      const currentConfirmedIds = new Set([
+        ...(item.confirmations || []).filter((confirmation) => confirmation.member_id === currentMember.id).map(() => item.id),
+        ...(childItemsByGroup.get(item.id) || [])
+          .filter((child) => (child.confirmations || []).some((confirmation) => confirmation.member_id === currentMember.id))
+          .map((child) => child.id),
+      ])
+      const shouldConfirm = ids.some((id) => !currentConfirmedIds.has(id))
+      const request = shouldConfirm
+        ? supabase
+            .from('trip_checklist_confirmations')
+            .upsert(
+              ids.map((id) => ({
+                trip_id: currentTrip!.id,
+                checklist_id: id,
+                member_id: currentMember.id,
+              })),
+              { onConflict: 'checklist_id,member_id' },
+            )
+        : supabase
+            .from('trip_checklist_confirmations')
+            .delete()
+            .in('checklist_id', ids)
+            .eq('member_id', currentMember.id)
 
+      const { error } = await request
       if (error) alert(error.message)
       else invalidateChecklists()
       return
     }
 
-    const { error } = await supabase
-      .from('trip_checklists')
-      .update({
-        is_completed: isCompleted,
-        completed_by_member_id: isCompleted ? currentMember.id : null,
-      })
-      .eq('id', item.id)
+    const confirmedByCurrentMember = (item.confirmations || []).some((confirmation) => confirmation.member_id === currentMember.id)
+    const request = confirmedByCurrentMember
+      ? supabase
+          .from('trip_checklist_confirmations')
+          .delete()
+          .eq('checklist_id', item.id)
+          .eq('member_id', currentMember.id)
+      : supabase
+          .from('trip_checklist_confirmations')
+          .insert({
+            trip_id: currentTrip!.id,
+            checklist_id: item.id,
+            member_id: currentMember.id,
+          })
 
+    const { error } = await request
     if (error) {
       alert(error.message)
       return
-    }
-
-    if (item.parent_id) {
-      const siblings = childItemsByGroup.get(item.parent_id) || []
-      const allChildrenCompleted = siblings.length > 0 && siblings.every((sibling) => (
-        sibling.id === item.id ? isCompleted : !!sibling.is_completed
-      ))
-
-      await supabase
-        .from('trip_checklists')
-        .update({
-          is_completed: allChildrenCompleted,
-          completed_by_member_id: allChildrenCompleted ? currentMember.id : null,
-        })
-        .eq('id', item.parent_id)
     }
 
     invalidateChecklists()
@@ -337,6 +355,9 @@ export default function ChecklistPage() {
     const isGroup = item.item_kind === 'group'
     const isChild = !!options?.isChild
     const canManage = canManageItem(item)
+    const confirmations = item.confirmations || []
+    const confirmedByCurrentMember = confirmations.some((confirmation) => confirmation.member_id === currentMember?.id)
+    const isCompletedForDisplay = confirmations.length > 0 || !!item.is_completed
 
     return (
       <motion.div
@@ -348,7 +369,7 @@ export default function ChecklistPage() {
         className={`glass-card border transition-all duration-300 flex items-center gap-3 sm:gap-4 group shadow-md ${
           isChild ? 'p-3.5 sm:p-4 rounded-[20px] ml-7 sm:ml-10' : 'p-4 sm:p-5 rounded-[24px]'
         } ${
-          item.is_completed ? 'bg-black/10 backdrop-blur-sm border-white/5 opacity-70' : 'bg-black/30 backdrop-blur-md border-white/20 hover:border-white/30'
+          isCompletedForDisplay ? 'bg-black/10 backdrop-blur-sm border-white/5 opacity-80' : 'bg-black/30 backdrop-blur-md border-white/20 hover:border-white/30'
         }`}
       >
         {isGroup && (
@@ -365,9 +386,9 @@ export default function ChecklistPage() {
         <button
           onClick={() => handleToggle(item)}
           className="shrink-0 focus:outline-none"
-          aria-label={item.is_completed ? '取消勾选' : '勾选'}
+          aria-label={confirmedByCurrentMember ? '取消我的确认' : '确认我已准备'}
         >
-          {item.is_completed ? (
+          {confirmedByCurrentMember ? (
             <CheckCircle2 className="w-7 h-7 text-white/80" />
           ) : (
             <Circle className="w-7 h-7 text-white/20 group-hover:text-white/40 transition-colors" />
@@ -389,7 +410,7 @@ export default function ChecklistPage() {
             <div className="flex-1 min-w-0">
               <span className={`block truncate transition-all ${
                 isGroup ? 'text-lg font-black' : 'text-base sm:text-lg font-medium'
-              } ${item.is_completed ? 'text-white/40 line-through' : 'text-white'}`}>
+              } ${confirmedByCurrentMember ? 'text-white/40 line-through' : 'text-white'}`}>
                 {item.title}
               </span>
               {isGroup && (
@@ -400,10 +421,21 @@ export default function ChecklistPage() {
             </div>
           )}
 
-          {item.is_completed && item.completed_by && (
-            <span className="shrink-0 text-[10px] font-black bg-emerald-500/80 text-white px-3 py-1 rounded-full uppercase tracking-widest border border-emerald-400/30 shadow-md drop-shadow-sm">
-              {item.completed_by.display_name}
-            </span>
+          {confirmations.length > 0 && (
+            <div className="shrink-0 flex flex-wrap justify-end gap-1.5 max-w-[160px] sm:max-w-[240px]">
+              {confirmations.map((confirmation) => (
+                <span
+                  key={confirmation.id}
+                  className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border shadow-md drop-shadow-sm ${
+                    confirmation.member_id === currentMember?.id
+                      ? 'bg-emerald-500/85 text-white border-emerald-400/30'
+                      : 'bg-white/10 text-white/75 border-white/10'
+                  }`}
+                >
+                  {confirmation.member?.display_name || '成员'}
+                </span>
+              ))}
+            </div>
           )}
 
           {activeCategory === 'personal' && item.created_by_member_id !== currentMember?.id && item.owner && (

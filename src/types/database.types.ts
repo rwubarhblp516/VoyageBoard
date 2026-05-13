@@ -104,6 +104,52 @@ export type Database = {
           },
         ]
       }
+      trip_checklist_confirmations: {
+        Row: {
+          checklist_id: string
+          confirmed_at: string | null
+          id: string
+          member_id: string
+          trip_id: string
+        }
+        Insert: {
+          checklist_id: string
+          confirmed_at?: string | null
+          id?: string
+          member_id: string
+          trip_id: string
+        }
+        Update: {
+          checklist_id?: string
+          confirmed_at?: string | null
+          id?: string
+          member_id?: string
+          trip_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_checklist_confirmations_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "trip_checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_checklist_confirmations_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "trip_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_checklist_confirmations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       timeline_entry_images: {
         Row: {
           created_at: string | null

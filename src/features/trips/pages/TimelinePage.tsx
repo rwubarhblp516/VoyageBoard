@@ -127,8 +127,18 @@ type EntryForm = {
   departure_time: string
   arrival_time: string
   distance_km: string
+  distance_source: DistanceSource
+  route_duration_minutes: string
   note: string
   include_in_guide: boolean
+}
+
+declare global {
+  interface Window {
+    AMap?: any
+    _AMapSecurityConfig?: { securityJsCode: string }
+    __voyageboardAMapLoader?: Promise<any>
+  }
 }
 
 const entryTypes: Array<{ value: TimelineEntryType; label: string; icon: React.ElementType; tone: string }> = [
@@ -177,6 +187,8 @@ const emptyForm = (type: TimelineEntryType): EntryForm => ({
   departure_time: '',
   arrival_time: '',
   distance_km: '',
+  distance_source: 'unknown',
+  route_duration_minutes: '',
   note: '',
   include_in_guide: true,
 })
@@ -219,6 +231,112 @@ const formatDuration = (minutes?: number | null) => {
 const getEntryMeta = (type: TimelineEntryType) => entryTypes.find((entryType) => entryType.value === type) || entryTypes[0]
 
 const getTransportMeta = (mode: string) => transportModes.find((item) => item.value === mode) || transportModes[transportModes.length - 1]
+
+const routeModeByTransport: Record<string, 'driving' | 'walking' | 'riding' | 'straight'> = {
+  walk: 'walking',
+  bike: 'riding',
+  flight: 'straight',
+  train: 'straight',
+  high_speed_rail: 'straight',
+  ship: 'straight',
+  ferry: 'straight',
+}
+
+const loadAMap = async () => {
+  const key = import.meta.env.VITE_AMAP_JS_API_KEY
+  const securityJsCode = import.meta.env.VITE_AMAP_SECURITY_JS_CODE
+
+  if (!key || !securityJsCode) {
+    throw new Error('还没有配置高德地图 Key。请配置 VITE_AMAP_JS_API_KEY 和 VITE_AMAP_SECURITY_JS_CODE。')
+  }
+
+  if (window.AMap) return window.AMap
+  if (window.__voyageboardAMapLoader) return window.__voyageboardAMapLoader
+
+  window._AMapSecurityConfig = { securityJsCode }
+  window.__voyageboardAMapLoader = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>('script[data-voyageboard-amap="true"]')
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(window.AMap))
+      existingScript.addEventListener('error', () => reject(new Error('高德地图脚本加载失败')))
+      return
+    }
+
+    const script = document.createElement('script')
+    script.dataset.voyageboardAmap = 'true'
+    script.async = true
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(key)}&plugin=AMap.Driving,AMap.Walking,AMap.Riding,AMap.Geocoder,AMap.GeometryUtil`
+    script.onload = () => resolve(window.AMap)
+    script.onerror = () => reject(new Error('高德地图脚本加载失败'))
+    document.head.appendChild(script)
+  })
+
+  return window.__voyageboardAMapLoader
+}
+
+const loadAMapPlugin = async (pluginName: string) => {
+  const AMap = await loadAMap()
+  await new Promise<void>((resolve) => AMap.plugin(pluginName, resolve))
+  return AMap
+}
+
+const getRouteDistance = async (
+  origin: string,
+  destination: string,
+  transportMode: string,
+): Promise<{ distanceKm: number; durationMinutes: number | null; sourceLabel: string }> => {
+  const routeMode = routeModeByTransport[transportMode] || 'driving'
+
+  if (routeMode === 'straight') {
+    const AMap = await loadAMapPlugin('AMap.Geocoder')
+    const geocoder = new AMap.Geocoder({ city: '全国' })
+    const geocode = (address: string) => new Promise<any>((resolve, reject) => {
+      geocoder.getLocation(address, (status: string, result: any) => {
+        const location = result?.geocodes?.[0]?.location
+        if (status === 'complete' && location) resolve(location)
+        else reject(new Error(`无法识别地点：${address}`))
+      })
+    })
+    const [originLocation, destinationLocation] = await Promise.all([geocode(origin), geocode(destination)])
+    const distanceMeters = AMap.GeometryUtil.distance(originLocation, destinationLocation)
+    return {
+      distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
+      durationMinutes: null,
+      sourceLabel: '已按两点直线距离估算',
+    }
+  }
+
+  const pluginName = routeMode === 'walking'
+    ? 'AMap.Walking'
+    : routeMode === 'riding'
+      ? 'AMap.Riding'
+      : 'AMap.Driving'
+  const AMap = await loadAMapPlugin(pluginName)
+  const RoutePlanner = routeMode === 'walking'
+    ? AMap.Walking
+    : routeMode === 'riding'
+      ? AMap.Riding
+      : AMap.Driving
+  const planner = new RoutePlanner({ city: '全国' })
+
+  return new Promise((resolve, reject) => {
+    planner.search(
+      [{ keyword: origin, city: '全国' }, { keyword: destination, city: '全国' }],
+      (status: string, result: any) => {
+        const route = result?.routes?.[0]
+        if (status === 'complete' && route?.distance !== undefined) {
+          resolve({
+            distanceKm: Math.round((Number(route.distance) / 1000) * 10) / 10,
+            durationMinutes: route.time !== undefined ? Math.round(Number(route.time) / 60) : null,
+            sourceLabel: routeMode === 'driving' ? '已按驾车路线估算' : routeMode === 'walking' ? '已按步行路线估算' : '已按骑行路线估算',
+          })
+        } else {
+          reject(new Error(result?.info || '没有找到可用路线，请补充更具体的起点和终点。'))
+        }
+      },
+    )
+  })
+}
 
 const getTimelineImageUrl = (storagePath: string) => (
   supabase.storage.from('trip-images').getPublicUrl(storagePath).data.publicUrl
@@ -278,6 +396,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [form, setForm] = useState<EntryForm>(emptyForm('transport'))
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
+  const [mapCalculating, setMapCalculating] = useState(false)
 
   const expectedDays = useMemo(
     () => buildExpectedDays(currentTrip.start_date, currentTrip.end_date),
@@ -398,6 +517,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       departure_time: segment?.departure_time?.slice(0, 5) || '',
       arrival_time: segment?.arrival_time?.slice(0, 5) || '',
       distance_km: segment?.distance_km !== null && segment?.distance_km !== undefined ? String(segment.distance_km) : '',
+      distance_source: segment?.distance_source || 'unknown',
+      route_duration_minutes: segment?.duration_minutes !== null && segment?.duration_minutes !== undefined ? String(segment.duration_minutes) : '',
       note: segment?.note || '',
       include_in_guide: entry.include_in_guide ?? true,
     })
@@ -409,13 +530,15 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setEditingEntry(null)
     setPendingImageFiles([])
     setSaving(false)
+    setMapCalculating(false)
   }
 
   const buildEntryPayload = () => {
     const isTransport = form.type === 'transport'
     const startTime = isTransport ? form.departure_time : form.start_time
     const endTime = isTransport ? form.arrival_time : form.end_time
-    const duration = calculateDuration(startTime, endTime)
+    const routeDuration = form.route_duration_minutes.trim() ? Number(form.route_duration_minutes) : null
+    const duration = calculateDuration(startTime, endTime) ?? (isTransport ? routeDuration : null)
     const tags = form.tagsText
       .split(/[、,，]/)
       .map((tag) => tag.trim())
@@ -444,6 +567,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
 
   const buildSegmentPayload = (timelineEntryId: string, sortOrder: number) => {
     const distance = form.distance_km.trim() ? Number(form.distance_km) : null
+    const routeDuration = form.route_duration_minutes.trim() ? Number(form.route_duration_minutes) : null
 
     return {
       trip_id: currentTrip.id,
@@ -454,9 +578,9 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       transport_mode: form.transport_mode,
       departure_time: form.departure_time || null,
       arrival_time: form.arrival_time || null,
-      duration_minutes: calculateDuration(form.departure_time, form.arrival_time),
+      duration_minutes: calculateDuration(form.departure_time, form.arrival_time) ?? routeDuration,
       distance_km: distance,
-      distance_source: distance === null ? 'unknown' : 'manual',
+      distance_source: distance === null ? 'unknown' : form.distance_source,
       note: form.note.trim() || null,
       sort_order: sortOrder,
       updated_at: new Date().toISOString(),
@@ -610,8 +734,34 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
   }
 
-  const handleMapCalculate = () => {
-    alert('地图计算已预留。后续配置地图服务后，可用起点和终点自动计算距离、耗时和路线。')
+  const handleMapCalculate = async () => {
+    const origin = form.origin_name.trim()
+    const destination = form.destination_name.trim()
+    if (!origin || !destination) {
+      alert('请先填写起点和终点')
+      return
+    }
+
+    if (form.distance_source === 'manual' && form.distance_km.trim()) {
+      const shouldOverwrite = window.confirm('当前距离已手动修改。重新计算会覆盖手动距离，是否继续？')
+      if (!shouldOverwrite) return
+    }
+
+    setMapCalculating(true)
+    try {
+      const result = await getRouteDistance(origin, destination, form.transport_mode)
+      setForm((current) => ({
+        ...current,
+        distance_km: String(result.distanceKm),
+        distance_source: 'auto',
+        route_duration_minutes: result.durationMinutes !== null ? String(result.durationMinutes) : current.route_duration_minutes,
+      }))
+      alert(`${result.sourceLabel}：${result.distanceKm} km${result.durationMinutes !== null ? `，约 ${formatDuration(result.durationMinutes)}` : ''}`)
+    } catch (error: any) {
+      alert(error.message || '高德地图计算失败')
+    } finally {
+      setMapCalculating(false)
+    }
   }
 
   const activeExpectedDay = expectedDays.find((day) => day.day_index === activeDayIndex) || expectedDays[0]
@@ -771,6 +921,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               form={form}
               saving={saving}
               editing={!!editingEntry}
+              mapCalculating={mapCalculating}
               onClose={closeForm}
               onSave={handleSave}
               onChange={updateForm}
@@ -1090,6 +1241,7 @@ function EntryFormModal({
   form,
   saving,
   editing,
+  mapCalculating,
   onClose,
   onSave,
   onChange,
@@ -1103,6 +1255,7 @@ function EntryFormModal({
   form: EntryForm
   saving: boolean
   editing: boolean
+  mapCalculating: boolean
   onClose: () => void
   onSave: (event: React.FormEvent) => void
   onChange: <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => void
@@ -1199,7 +1352,11 @@ function EntryFormModal({
                   step="0.01"
                   min="0"
                   value={form.distance_km}
-                  onChange={(event) => onChange('distance_km', event.target.value)}
+                  onChange={(event) => {
+                    onChange('distance_km', event.target.value)
+                    onChange('distance_source', event.target.value ? 'manual' : 'unknown')
+                    if (!event.target.value) onChange('route_duration_minutes', '')
+                  }}
                   placeholder="手动填写，例如 92"
                   className="glass-input"
                 />
@@ -1207,10 +1364,11 @@ function EntryFormModal({
               <button
                 type="button"
                 onClick={onMapCalculate}
-                className="h-[58px] rounded-2xl px-5 bg-white/10 hover:bg-white/15 border border-white/15 text-white font-black flex items-center justify-center gap-2"
+                disabled={mapCalculating}
+                className="h-[58px] rounded-2xl px-5 bg-white/10 hover:bg-white/15 disabled:bg-white/5 disabled:text-white/35 border border-white/15 text-white font-black flex items-center justify-center gap-2"
               >
-                <MapPinned className="w-4 h-4" />
-                计算距离与耗时
+                {mapCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPinned className="w-4 h-4" />}
+                {mapCalculating ? '计算中' : '计算距离与耗时'}
               </button>
             </div>
 
@@ -1218,6 +1376,13 @@ function EntryFormModal({
               <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/70">
                 <Clock3 className="w-4 h-4" />
                 已根据时间自动计算耗时：{formatDuration(duration)}
+              </div>
+            )}
+
+            {duration === null && form.route_duration_minutes && (
+              <div className="flex items-center gap-2 rounded-2xl border border-sky-300/15 bg-sky-400/10 px-4 py-3 text-sm font-bold text-sky-100/80">
+                <MapPinned className="w-4 h-4" />
+                高德路线预估耗时：{formatDuration(Number(form.route_duration_minutes))}
               </div>
             )}
 

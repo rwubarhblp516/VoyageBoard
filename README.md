@@ -43,12 +43,15 @@ Create a local `.env` file with:
 ```bash
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_PUBLISHABLE_KEY=...
+VITE_AMAP_JS_API_KEY=...
+VITE_AMAP_SECURITY_JS_CODE=...
 ```
 
 Important:
 
 - `.env` is intentionally ignored and must not be committed.
-- `VITE_*` values are bundled into the frontend build. Do not put private service-role keys there.
+- `VITE_*` values are bundled into the frontend build. Do not put Supabase service-role keys or other server-only secrets there.
+- 高德地图 JSAPI v2 需要 `VITE_AMAP_JS_API_KEY` 和 `VITE_AMAP_SECURITY_JS_CODE`。生产环境必须在高德控制台配置域名白名单，后续如需隐藏安全密钥再改成 `serviceHost` 代理方案。
 - Cloudflare Pages project `trip` also needs these variables configured in its dashboard environment variables.
 
 ## Supabase

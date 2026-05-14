@@ -1215,17 +1215,25 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
           viewMode: '2D',
           zoom: 11,
           center: [mapPoints[0].longitude, mapPoints[0].latitude],
-          mapStyle: 'amap://styles/darkblue',
+          mapStyle: 'amap://styles/whitesmoke',
+          showLabel: true,
+          resizeEnable: true,
         })
 
         const markers = mapPoints.map((point, index) => new AMap.Marker({
           position: [point.longitude, point.latitude],
           anchor: 'bottom-center',
           title: point.name,
-          label: {
-            direction: 'top',
-            content: `<div style="background:#fff;color:#111;border-radius:999px;padding:4px 8px;font-weight:900;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25);">${index + 1}</div>`,
-          },
+          offset: new AMap.Pixel(0, 0),
+          content: `
+            <div style="position:relative;width:34px;height:42px;filter:drop-shadow(0 14px 18px rgba(0,0,0,.28));">
+              <div style="position:absolute;left:4px;top:0;width:26px;height:26px;border-radius:999px;background:linear-gradient(135deg,#111827,#0ea5e9 62%,#67e8f9);border:2px solid rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:900;box-shadow:0 8px 22px rgba(14,165,233,.35);">
+                ${index + 1}
+              </div>
+              <div style="position:absolute;left:14px;top:23px;width:7px;height:14px;border-radius:999px;background:linear-gradient(180deg,#0ea5e9,#111827);transform:rotate(28deg);border:1px solid rgba(255,255,255,.45);"></div>
+              <div style="position:absolute;left:10px;bottom:0;width:14px;height:4px;border-radius:999px;background:rgba(15,23,42,.28);filter:blur(1px);"></div>
+            </div>
+          `,
         }))
         map.add(markers)
 
@@ -1245,10 +1253,13 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
             if (path.length < 2) return null
             return new AMap.Polyline({
               path,
-              strokeColor: routePoints.length > 1 ? '#7dd3fc' : '#ffffff',
-              strokeWeight: 5,
-              strokeOpacity: routePoints.length > 1 ? 0.9 : 0.55,
+              strokeColor: routePoints.length > 1 ? '#0ea5e9' : '#64748b',
+              strokeWeight: routePoints.length > 1 ? 6 : 4,
+              strokeOpacity: routePoints.length > 1 ? 0.82 : 0.55,
               strokeStyle: routePoints.length > 1 ? 'solid' : 'dashed',
+              lineJoin: 'round',
+              lineCap: 'round',
+              showDir: routePoints.length > 1,
             })
           })
           .filter(Boolean)
@@ -1280,15 +1291,31 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   }
 
   return (
-    <section className="mb-6 overflow-hidden rounded-[28px] border border-white/10 bg-black/25 shadow-lg">
+    <section className="mb-6 overflow-hidden rounded-[30px] border border-white/10 bg-zinc-950/35 shadow-lg backdrop-blur-xl">
       <div className="flex items-center justify-between gap-3 px-5 py-4">
         <div>
           <h3 className="text-base font-black text-white">今日地图</h3>
           <p className="mt-1 text-xs font-bold text-white/45">{activeDateLabel} · {mapPoints.length} 个点位</p>
         </div>
-        <MapPinned className="h-5 w-5 text-white/45" />
+        <div className="rounded-2xl border border-white/10 bg-white/8 p-2 text-white/55">
+          <MapPinned className="h-5 w-5" />
+        </div>
       </div>
-      <div id={containerId} className="h-[280px] w-full bg-black/30 sm:h-[360px]" />
+      <div className="relative mx-3 mb-3 overflow-hidden rounded-[24px] border border-white/10 bg-slate-100">
+        <div id={containerId} className="h-[280px] w-full sm:h-[360px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/25 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />
+        <div className="pointer-events-none absolute left-3 right-3 bottom-3 flex gap-2 overflow-hidden">
+          {mapPoints.slice(0, 5).map((point, index) => (
+            <div key={`${point.name}-${point.longitude}-${point.latitude}-chip`} className="min-w-0 max-w-[160px] rounded-full border border-white/25 bg-zinc-950/70 px-3 py-2 text-xs font-black text-white shadow-lg backdrop-blur-md">
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-400 text-[10px] text-black">
+                {index + 1}
+              </span>
+              <span className="align-middle">{point.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
       {mapError && (
         <div className="border-t border-white/10 px-5 py-3 text-xs font-bold text-rose-100/80">
           {mapError}

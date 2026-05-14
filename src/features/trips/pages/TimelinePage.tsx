@@ -62,12 +62,19 @@ type TravelSegment = {
   timeline_entry_id: string | null
   origin_name: string
   destination_name: string
+  origin_address: string | null
+  destination_address: string | null
+  origin_latitude: number | null
+  origin_longitude: number | null
+  destination_latitude: number | null
+  destination_longitude: number | null
   transport_mode: string
   departure_time: string | null
   arrival_time: string | null
   duration_minutes: number | null
   distance_km: number | null
   distance_source: DistanceSource
+  route_polyline: string | null
   note: string | null
   sort_order: number
 }
@@ -99,6 +106,8 @@ type TimelineEntry = {
   duration_minutes: number | null
   place_name: string | null
   address: string | null
+  latitude: number | null
+  longitude: number | null
   recommend_level: RecommendLevel | null
   rating: number | null
   tags: string[] | null
@@ -122,15 +131,40 @@ type EntryForm = {
   rating: string
   tagsText: string
   origin_name: string
+  origin_address: string
+  origin_latitude: string
+  origin_longitude: string
   destination_name: string
+  destination_address: string
+  destination_latitude: string
+  destination_longitude: string
   transport_mode: string
   departure_time: string
   arrival_time: string
   distance_km: string
   distance_source: DistanceSource
   route_duration_minutes: string
+  route_polyline: string
+  latitude: string
+  longitude: string
   note: string
   include_in_guide: boolean
+}
+
+type LocationPoint = {
+  name: string
+  address: string
+  latitude: number
+  longitude: number
+}
+
+type RouteCalculationResult = {
+  distanceKm: number
+  durationMinutes: number | null
+  sourceLabel: string
+  origin: LocationPoint
+  destination: LocationPoint
+  routePolyline: string
 }
 
 declare global {
@@ -182,13 +216,22 @@ const emptyForm = (type: TimelineEntryType): EntryForm => ({
   rating: '',
   tagsText: '',
   origin_name: '',
+  origin_address: '',
+  origin_latitude: '',
+  origin_longitude: '',
   destination_name: '',
+  destination_address: '',
+  destination_latitude: '',
+  destination_longitude: '',
   transport_mode: 'rental_car',
   departure_time: '',
   arrival_time: '',
   distance_km: '',
   distance_source: 'unknown',
   route_duration_minutes: '',
+  route_polyline: '',
+  latitude: '',
+  longitude: '',
   note: '',
   include_in_guide: true,
 })
@@ -280,29 +323,128 @@ const loadAMapPlugin = async (pluginName: string) => {
   return AMap
 }
 
+const normalizeAddress = (poi: any) => (
+  [poi.district, Array.isArray(poi.address) ? poi.address.join('') : poi.address]
+    .filter(Boolean)
+    .join(' ')
+)
+
+const toLocationPoint = (poi: any, fallbackName: string): LocationPoint | null => {
+  const location = poi?.location
+  const longitude = Number(location?.lng)
+  const latitude = Number(location?.lat)
+  if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
+
+  return {
+    name: poi.name || fallbackName,
+    address: normalizeAddress(poi),
+    latitude,
+    longitude,
+  }
+}
+
+const searchPoiSuggestions = async (keyword: string): Promise<LocationPoint[]> => {
+  const trimmedKeyword = keyword.trim()
+  if (trimmedKeyword.length < 2) return []
+
+  const AMap = await loadAMapPlugin('AMap.AutoComplete')
+  const autocomplete = new AMap.AutoComplete({ city: '全国', citylimit: false })
+
+  return new Promise((resolve, reject) => {
+    autocomplete.search(trimmedKeyword, (status: string, result: any) => {
+      if (status === 'complete') {
+        const tips = Array.isArray(result?.tips) ? result.tips : []
+        resolve(tips.map((tip: any) => toLocationPoint(tip, trimmedKeyword)).filter(Boolean).slice(0, 8))
+        return
+      }
+      if (status === 'no_data') {
+        resolve([])
+        return
+      }
+      reject(new Error(result?.info || '地点搜索失败'))
+    })
+  })
+}
+
+const getLocationByKeyword = async (keyword: string): Promise<LocationPoint> => {
+  const suggestions = await searchPoiSuggestions(keyword)
+  if (suggestions[0]) return suggestions[0]
+
+  const AMap = await loadAMapPlugin('AMap.Geocoder')
+  const geocoder = new AMap.Geocoder({ city: '全国' })
+  return new Promise((resolve, reject) => {
+    geocoder.getLocation(keyword, (status: string, result: any) => {
+      const location = toLocationPoint(result?.geocodes?.[0], keyword)
+      if (status === 'complete' && location) resolve(location)
+      else reject(new Error(`无法识别地点：${keyword}`))
+    })
+  })
+}
+
+const serializePolyline = (points: Array<[number, number]>) => JSON.stringify(points)
+
+const parsePolyline = (polyline?: string | null): Array<[number, number]> => {
+  if (!polyline) return []
+  try {
+    const points = JSON.parse(polyline)
+    if (!Array.isArray(points)) return []
+    return points
+      .map((point) => [Number(point[0]), Number(point[1])] as [number, number])
+      .filter(([longitude, latitude]) => Number.isFinite(longitude) && Number.isFinite(latitude))
+  } catch {
+    return []
+  }
+}
+
+const calculateStraightDistanceMeters = (origin: LocationPoint, destination: LocationPoint) => {
+  const earthRadiusMeters = 6371000
+  const toRadians = (degrees: number) => degrees * Math.PI / 180
+  const originLatitude = toRadians(origin.latitude)
+  const destinationLatitude = toRadians(destination.latitude)
+  const latitudeDelta = toRadians(destination.latitude - origin.latitude)
+  const longitudeDelta = toRadians(destination.longitude - origin.longitude)
+  const a = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(originLatitude) * Math.cos(destinationLatitude) * Math.sin(longitudeDelta / 2) ** 2
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+const flattenRoutePolyline = (route: any): Array<[number, number]> => {
+  const steps = Array.isArray(route?.steps) ? route.steps : []
+  return steps.flatMap((step: any) => (
+    Array.isArray(step?.path)
+      ? step.path
+        .map((point: any) => [Number(point.lng), Number(point.lat)] as [number, number])
+        .filter((point: [number, number]) => Number.isFinite(point[0]) && Number.isFinite(point[1]))
+      : []
+  ))
+}
+
 const getRouteDistance = async (
-  origin: string,
-  destination: string,
+  originText: string,
+  destinationText: string,
   transportMode: string,
-): Promise<{ distanceKm: number; durationMinutes: number | null; sourceLabel: string }> => {
+  knownOrigin?: LocationPoint | null,
+  knownDestination?: LocationPoint | null,
+): Promise<RouteCalculationResult> => {
   const routeMode = routeModeByTransport[transportMode] || 'driving'
+  const [origin, destination] = await Promise.all([
+    knownOrigin || getLocationByKeyword(originText),
+    knownDestination || getLocationByKeyword(destinationText),
+  ])
+  const straightPolyline = serializePolyline([
+    [origin.longitude, origin.latitude],
+    [destination.longitude, destination.latitude],
+  ])
 
   if (routeMode === 'straight') {
-    const AMap = await loadAMapPlugin('AMap.Geocoder')
-    const geocoder = new AMap.Geocoder({ city: '全国' })
-    const geocode = (address: string) => new Promise<any>((resolve, reject) => {
-      geocoder.getLocation(address, (status: string, result: any) => {
-        const location = result?.geocodes?.[0]?.location
-        if (status === 'complete' && location) resolve(location)
-        else reject(new Error(`无法识别地点：${address}`))
-      })
-    })
-    const [originLocation, destinationLocation] = await Promise.all([geocode(origin), geocode(destination)])
-    const distanceMeters = AMap.GeometryUtil.distance(originLocation, destinationLocation)
+    const distanceMeters = calculateStraightDistanceMeters(origin, destination)
     return {
       distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
       durationMinutes: null,
       sourceLabel: '已按两点直线距离估算',
+      origin,
+      destination,
+      routePolyline: straightPolyline,
     }
   }
 
@@ -321,14 +463,19 @@ const getRouteDistance = async (
 
   return new Promise((resolve, reject) => {
     planner.search(
-      [{ keyword: origin, city: '全国' }, { keyword: destination, city: '全国' }],
+      new AMap.LngLat(origin.longitude, origin.latitude),
+      new AMap.LngLat(destination.longitude, destination.latitude),
       (status: string, result: any) => {
         const route = result?.routes?.[0]
         if (status === 'complete' && route?.distance !== undefined) {
+          const routePoints = flattenRoutePolyline(route)
           resolve({
             distanceKm: Math.round((Number(route.distance) / 1000) * 10) / 10,
             durationMinutes: route.time !== undefined ? Math.round(Number(route.time) / 60) : null,
             sourceLabel: routeMode === 'driving' ? '已按驾车路线估算' : routeMode === 'walking' ? '已按步行路线估算' : '已按骑行路线估算',
+            origin,
+            destination,
+            routePolyline: routePoints.length > 1 ? serializePolyline(routePoints) : straightPolyline,
           })
         } else {
           reject(new Error(result?.info || '没有找到可用路线，请补充更具体的起点和终点。'))
@@ -512,13 +659,22 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       rating: entry.rating ? String(entry.rating) : '',
       tagsText: (entry.tags || []).join('、'),
       origin_name: segment?.origin_name || '',
+      origin_address: segment?.origin_address || '',
+      origin_latitude: segment?.origin_latitude !== null && segment?.origin_latitude !== undefined ? String(segment.origin_latitude) : '',
+      origin_longitude: segment?.origin_longitude !== null && segment?.origin_longitude !== undefined ? String(segment.origin_longitude) : '',
       destination_name: segment?.destination_name || '',
+      destination_address: segment?.destination_address || '',
+      destination_latitude: segment?.destination_latitude !== null && segment?.destination_latitude !== undefined ? String(segment.destination_latitude) : '',
+      destination_longitude: segment?.destination_longitude !== null && segment?.destination_longitude !== undefined ? String(segment.destination_longitude) : '',
       transport_mode: segment?.transport_mode || 'rental_car',
       departure_time: segment?.departure_time?.slice(0, 5) || '',
       arrival_time: segment?.arrival_time?.slice(0, 5) || '',
       distance_km: segment?.distance_km !== null && segment?.distance_km !== undefined ? String(segment.distance_km) : '',
       distance_source: segment?.distance_source || 'unknown',
       route_duration_minutes: segment?.duration_minutes !== null && segment?.duration_minutes !== undefined ? String(segment.duration_minutes) : '',
+      route_polyline: segment?.route_polyline || '',
+      latitude: entry.latitude !== null && entry.latitude !== undefined ? String(entry.latitude) : '',
+      longitude: entry.longitude !== null && entry.longitude !== undefined ? String(entry.longitude) : '',
       note: segment?.note || '',
       include_in_guide: entry.include_in_guide ?? true,
     })
@@ -539,6 +695,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     const endTime = isTransport ? form.arrival_time : form.end_time
     const routeDuration = form.route_duration_minutes.trim() ? Number(form.route_duration_minutes) : null
     const duration = calculateDuration(startTime, endTime) ?? (isTransport ? routeDuration : null)
+    const latitude = form.latitude.trim() ? Number(form.latitude) : null
+    const longitude = form.longitude.trim() ? Number(form.longitude) : null
     const tags = form.tagsText
       .split(/[、,，]/)
       .map((tag) => tag.trim())
@@ -548,13 +706,15 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       trip_id: currentTrip.id,
       day_id: activeDay!.id,
       type: form.type,
-      title: isTransport ? `${form.origin_name.trim()} → ${form.destination_name.trim()}` : form.title.trim(),
+      title: isTransport ? `${form.origin_name.trim()} → ${form.destination_name.trim()}` : (form.title.trim() || form.place_name.trim()),
       content: isTransport ? (form.note.trim() || null) : (form.content.trim() || null),
       start_time: startTime || null,
       end_time: endTime || null,
       duration_minutes: duration,
       place_name: isTransport ? null : (form.place_name.trim() || null),
       address: isTransport ? null : (form.address.trim() || null),
+      latitude: isTransport ? null : latitude,
+      longitude: isTransport ? null : longitude,
       recommend_level: isTransport ? null : form.recommend_level,
       rating: !isTransport && form.rating ? Number(form.rating) : null,
       tags,
@@ -568,6 +728,10 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const buildSegmentPayload = (timelineEntryId: string, sortOrder: number) => {
     const distance = form.distance_km.trim() ? Number(form.distance_km) : null
     const routeDuration = form.route_duration_minutes.trim() ? Number(form.route_duration_minutes) : null
+    const originLatitude = form.origin_latitude.trim() ? Number(form.origin_latitude) : null
+    const originLongitude = form.origin_longitude.trim() ? Number(form.origin_longitude) : null
+    const destinationLatitude = form.destination_latitude.trim() ? Number(form.destination_latitude) : null
+    const destinationLongitude = form.destination_longitude.trim() ? Number(form.destination_longitude) : null
 
     return {
       trip_id: currentTrip.id,
@@ -575,12 +739,19 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       timeline_entry_id: timelineEntryId,
       origin_name: form.origin_name.trim(),
       destination_name: form.destination_name.trim(),
+      origin_address: form.origin_address.trim() || null,
+      destination_address: form.destination_address.trim() || null,
+      origin_latitude: originLatitude,
+      origin_longitude: originLongitude,
+      destination_latitude: destinationLatitude,
+      destination_longitude: destinationLongitude,
       transport_mode: form.transport_mode,
       departure_time: form.departure_time || null,
       arrival_time: form.arrival_time || null,
       duration_minutes: calculateDuration(form.departure_time, form.arrival_time) ?? routeDuration,
       distance_km: distance,
       distance_source: distance === null ? 'unknown' : form.distance_source,
+      route_polyline: form.route_polyline || null,
       note: form.note.trim() || null,
       sort_order: sortOrder,
       updated_at: new Date().toISOString(),
@@ -662,8 +833,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       return
     }
 
-    if (form.type !== 'transport' && !form.title.trim()) {
-      alert('请填写标题')
+    if (form.type !== 'transport' && !form.title.trim() && !form.place_name.trim()) {
+      alert('请填写标题或地点')
       return
     }
 
@@ -734,6 +905,25 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
   }
 
+  const getKnownPoint = (
+    name: string,
+    address: string,
+    latitude: string,
+    longitude: string,
+  ): LocationPoint | null => {
+    const parsedLatitude = latitude.trim() ? Number(latitude) : null
+    const parsedLongitude = longitude.trim() ? Number(longitude) : null
+    if (parsedLatitude === null || parsedLongitude === null || !Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)) {
+      return null
+    }
+    return {
+      name: name.trim(),
+      address: address.trim(),
+      latitude: parsedLatitude,
+      longitude: parsedLongitude,
+    }
+  }
+
   const handleMapCalculate = async () => {
     const origin = form.origin_name.trim()
     const destination = form.destination_name.trim()
@@ -749,12 +939,27 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
 
     setMapCalculating(true)
     try {
-      const result = await getRouteDistance(origin, destination, form.transport_mode)
+      const result = await getRouteDistance(
+        origin,
+        destination,
+        form.transport_mode,
+        getKnownPoint(form.origin_name, form.origin_address, form.origin_latitude, form.origin_longitude),
+        getKnownPoint(form.destination_name, form.destination_address, form.destination_latitude, form.destination_longitude),
+      )
       setForm((current) => ({
         ...current,
+        origin_name: result.origin.name,
+        origin_address: result.origin.address,
+        origin_latitude: String(result.origin.latitude),
+        origin_longitude: String(result.origin.longitude),
+        destination_name: result.destination.name,
+        destination_address: result.destination.address,
+        destination_latitude: String(result.destination.latitude),
+        destination_longitude: String(result.destination.longitude),
         distance_km: String(result.distanceKm),
         distance_source: 'auto',
         route_duration_minutes: result.durationMinutes !== null ? String(result.durationMinutes) : current.route_duration_minutes,
+        route_polyline: result.routePolyline,
       }))
       alert(`${result.sourceLabel}：${result.distanceKm} km${result.durationMinutes !== null ? `，约 ${formatDuration(result.durationMinutes)}` : ''}`)
     } catch (error: any) {
@@ -829,6 +1034,10 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
           })}
         </div>
       </div>
+
+      {entries && entries.length > 0 && (
+        <DailyRouteMap entries={entries} activeDateLabel={formatDateLabel(activeDateLabel)} />
+      )}
 
       {daysLoading || entriesLoading ? (
         <div className="flex items-center justify-center py-32">
@@ -941,6 +1150,152 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
 
 function ModalPortal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body)
+}
+
+function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[]; activeDateLabel: string }) {
+  const [containerId] = useState(() => `daily-route-map-${crypto.randomUUID()}`)
+  const [mapError, setMapError] = useState('')
+
+  const mapPoints = useMemo(() => {
+    const points: Array<{ name: string; address?: string | null; longitude: number; latitude: number; type: TimelineEntryType }> = []
+
+    entries.forEach((entry) => {
+      const segment = entry.travel_segments?.[0]
+      if (entry.type === 'transport' && segment) {
+        if (segment.origin_longitude !== null && segment.origin_latitude !== null) {
+          points.push({
+            name: segment.origin_name,
+            address: segment.origin_address,
+            longitude: segment.origin_longitude,
+            latitude: segment.origin_latitude,
+            type: entry.type,
+          })
+        }
+        if (segment.destination_longitude !== null && segment.destination_latitude !== null) {
+          points.push({
+            name: segment.destination_name,
+            address: segment.destination_address,
+            longitude: segment.destination_longitude,
+            latitude: segment.destination_latitude,
+            type: entry.type,
+          })
+        }
+        return
+      }
+
+      if (entry.longitude !== null && entry.latitude !== null && entry.place_name) {
+        points.push({
+          name: entry.place_name,
+          address: entry.address,
+          longitude: entry.longitude,
+          latitude: entry.latitude,
+          type: entry.type,
+        })
+      }
+    })
+
+    const seen = new Set<string>()
+    return points.filter((point) => {
+      const key = `${point.name}-${point.longitude}-${point.latitude}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [entries])
+
+  useEffect(() => {
+    if (mapPoints.length === 0) return
+    let map: any
+    let disposed = false
+
+    loadAMap()
+      .then((AMap) => {
+        if (disposed) return
+        map = new AMap.Map(containerId, {
+          viewMode: '2D',
+          zoom: 11,
+          center: [mapPoints[0].longitude, mapPoints[0].latitude],
+          mapStyle: 'amap://styles/darkblue',
+        })
+
+        const markers = mapPoints.map((point, index) => new AMap.Marker({
+          position: [point.longitude, point.latitude],
+          anchor: 'bottom-center',
+          title: point.name,
+          label: {
+            direction: 'top',
+            content: `<div style="background:#fff;color:#111;border-radius:999px;padding:4px 8px;font-weight:900;font-size:12px;box-shadow:0 10px 24px rgba(0,0,0,.25);">${index + 1}</div>`,
+          },
+        }))
+        map.add(markers)
+
+        const polylines = entries
+          .map((entry) => entry.travel_segments?.[0])
+          .filter((segment): segment is TravelSegment => Boolean(segment))
+          .map((segment: TravelSegment) => {
+            const routePoints = parsePolyline(segment.route_polyline)
+            const path = routePoints.length > 1
+              ? routePoints
+              : segment.origin_longitude !== null && segment.origin_latitude !== null && segment.destination_longitude !== null && segment.destination_latitude !== null
+                ? [
+                    [segment.origin_longitude, segment.origin_latitude],
+                    [segment.destination_longitude, segment.destination_latitude],
+                  ] as Array<[number, number]>
+                : []
+            if (path.length < 2) return null
+            return new AMap.Polyline({
+              path,
+              strokeColor: routePoints.length > 1 ? '#7dd3fc' : '#ffffff',
+              strokeWeight: 5,
+              strokeOpacity: routePoints.length > 1 ? 0.9 : 0.55,
+              strokeStyle: routePoints.length > 1 ? 'solid' : 'dashed',
+            })
+          })
+          .filter(Boolean)
+
+        if (polylines.length > 0) map.add(polylines)
+        map.setFitView([...markers, ...polylines], false, [42, 42, 42, 42])
+        setMapError('')
+      })
+      .catch((error: any) => setMapError(error.message || '地图加载失败'))
+
+    return () => {
+      disposed = true
+      if (map) map.destroy()
+    }
+  }, [containerId, entries, mapPoints])
+
+  if (mapPoints.length === 0) {
+    return (
+      <section className="mb-6 rounded-[28px] border border-white/10 bg-black/20 p-5">
+        <div className="flex items-center gap-3 text-white/70">
+          <MapPinned className="h-5 w-5" />
+          <div>
+            <h3 className="text-sm font-black text-white">今日地图</h3>
+            <p className="mt-1 text-xs font-bold text-white/45">给记录选择高德地点后，这里会自动生成当天路线图。</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="mb-6 overflow-hidden rounded-[28px] border border-white/10 bg-black/25 shadow-lg">
+      <div className="flex items-center justify-between gap-3 px-5 py-4">
+        <div>
+          <h3 className="text-base font-black text-white">今日地图</h3>
+          <p className="mt-1 text-xs font-bold text-white/45">{activeDateLabel} · {mapPoints.length} 个点位</p>
+        </div>
+        <MapPinned className="h-5 w-5 text-white/45" />
+      </div>
+      <div id={containerId} className="h-[280px] w-full bg-black/30 sm:h-[360px]" />
+      {mapError && (
+        <div className="border-t border-white/10 px-5 py-3 text-xs font-bold text-rose-100/80">
+          {mapError}
+        </div>
+      )}
+    </section>
+  )
 }
 
 function TimelineCard({
@@ -1304,19 +1659,45 @@ function EntryFormModal({
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="起点">
-                <input
+                <LocationSearchInput
                   value={form.origin_name}
-                  onChange={(event) => onChange('origin_name', event.target.value)}
                   placeholder="例如：海口美兰机场"
-                  className="glass-input"
+                  selectedAddress={form.origin_address}
+                  onInputChange={(value) => {
+                    onChange('origin_name', value)
+                    onChange('origin_address', '')
+                    onChange('origin_latitude', '')
+                    onChange('origin_longitude', '')
+                    onChange('route_polyline', '')
+                  }}
+                  onSelect={(location) => {
+                    onChange('origin_name', location.name)
+                    onChange('origin_address', location.address)
+                    onChange('origin_latitude', String(location.latitude))
+                    onChange('origin_longitude', String(location.longitude))
+                    onChange('route_polyline', '')
+                  }}
                 />
               </Field>
               <Field label="终点">
-                <input
+                <LocationSearchInput
                   value={form.destination_name}
-                  onChange={(event) => onChange('destination_name', event.target.value)}
                   placeholder="例如：文昌酒店"
-                  className="glass-input"
+                  selectedAddress={form.destination_address}
+                  onInputChange={(value) => {
+                    onChange('destination_name', value)
+                    onChange('destination_address', '')
+                    onChange('destination_latitude', '')
+                    onChange('destination_longitude', '')
+                    onChange('route_polyline', '')
+                  }}
+                  onSelect={(location) => {
+                    onChange('destination_name', location.name)
+                    onChange('destination_address', location.address)
+                    onChange('destination_latitude', String(location.latitude))
+                    onChange('destination_longitude', String(location.longitude))
+                    onChange('route_polyline', '')
+                  }}
                 />
               </Field>
             </div>
@@ -1420,7 +1801,23 @@ function EntryFormModal({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="地点">
-                <input value={form.place_name} onChange={(event) => onChange('place_name', event.target.value)} placeholder="地点/店名/酒店名" className="glass-input" />
+                <LocationSearchInput
+                  value={form.place_name}
+                  placeholder="地点/店名/酒店名"
+                  selectedAddress={form.address}
+                  onInputChange={(value) => {
+                    onChange('place_name', value)
+                    onChange('address', '')
+                    onChange('latitude', '')
+                    onChange('longitude', '')
+                  }}
+                  onSelect={(location) => {
+                    onChange('place_name', location.name)
+                    onChange('address', location.address)
+                    onChange('latitude', String(location.latitude))
+                    onChange('longitude', String(location.longitude))
+                  }}
+                />
               </Field>
               <Field label="地址">
                 <input value={form.address} onChange={(event) => onChange('address', event.target.value)} placeholder="可选" className="glass-input" />
@@ -1511,6 +1908,103 @@ function EntryFormModal({
           </button>
         </div>
       </motion.form>
+    </div>
+  )
+}
+
+function LocationSearchInput({
+  value,
+  placeholder,
+  selectedAddress,
+  onInputChange,
+  onSelect,
+}: {
+  value: string
+  placeholder: string
+  selectedAddress?: string
+  onInputChange: (value: string) => void
+  onSelect: (location: LocationPoint) => void
+}) {
+  const [suggestions, setSuggestions] = useState<LocationPoint[]>([])
+  const [searching, setSearching] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    const keyword = value.trim()
+    if (keyword.length < 2) {
+      setSuggestions([])
+      setOpen(false)
+      return
+    }
+
+    let alive = true
+    const timer = window.setTimeout(() => {
+      setSearching(true)
+      searchPoiSuggestions(keyword)
+        .then((items) => {
+          if (!alive) return
+          setSuggestions(items)
+          setOpen(items.length > 0)
+        })
+        .catch(() => {
+          if (!alive) return
+          setSuggestions([])
+          setOpen(false)
+        })
+        .finally(() => {
+          if (alive) setSearching(false)
+        })
+    }, 280)
+
+    return () => {
+      alive = false
+      window.clearTimeout(timer)
+    }
+  }, [value])
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(event) => onInputChange(event.target.value)}
+          onFocus={() => setOpen(suggestions.length > 0)}
+          placeholder={placeholder}
+          className="glass-input pr-11"
+        />
+        {searching ? (
+          <Loader2 className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/35" />
+        ) : (
+          <MapPin className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+        )}
+      </div>
+
+      {selectedAddress && (
+        <div className="mt-2 flex items-start gap-2 rounded-2xl border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs font-bold text-emerald-50/75">
+          <MapPinned className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span className="line-clamp-2">{selectedAddress}</span>
+        </div>
+      )}
+
+      {open && suggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[95] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-2xl backdrop-blur-xl">
+          {suggestions.map((location) => (
+            <button
+              key={`${location.name}-${location.longitude}-${location.latitude}`}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onSelect(location)
+                setOpen(false)
+              }}
+              className="block w-full px-4 py-3 text-left hover:bg-white/10"
+            >
+              <span className="block text-sm font-black text-white">{location.name}</span>
+              <span className="mt-1 block truncate text-xs font-bold text-white/45">{location.address || '高德地点'}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

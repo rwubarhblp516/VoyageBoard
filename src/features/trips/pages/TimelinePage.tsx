@@ -1595,63 +1595,19 @@ function TimelineCard({
         {index + 1}
       </div>
 
-      <div className="glass-card rounded-[28px] border border-white/10 p-5 shadow-lg transition-all hover:border-white/20">
+      <div className="glass-card rounded-[24px] border border-white/10 p-4 sm:rounded-[28px] sm:p-5 shadow-lg transition-all hover:border-white/20">
         <div className="flex items-start gap-4">
-          <div className={`shrink-0 w-12 h-12 rounded-2xl border flex items-center justify-center ${meta.tone}`}>
+          <div className={`shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl border flex items-center justify-center ${meta.tone}`}>
             {entry.type === 'transport' ? <TransportIcon className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.2em]">{formatTime(time)}</span>
-                  <span className="text-[11px] font-black text-white/35">{meta.label}</span>
-                </div>
-                <h3 className="text-lg sm:text-xl font-black text-white tracking-tight break-words">{entry.title}</h3>
+            <div className="min-w-0">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
+                <span className="text-[11px] font-black text-white/35">{meta.label}</span>
               </div>
-
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  disabled={moving}
-                  {...attributes}
-                  {...listeners}
-                  className="cursor-grab touch-none rounded-xl p-2 text-white/35 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
-                  aria-label="拖拽排序"
-                  title="拖拽排序"
-                >
-                  <GripVertical className="w-4 h-4" />
-                </button>
-                <div className="flex rounded-xl border border-white/10 bg-white/5">
-                  <button
-                    type="button"
-                    onClick={onMoveUp}
-                    disabled={!canMoveUp || moving}
-                    className="p-2 text-white/45 hover:text-white disabled:opacity-25"
-                    aria-label="上移记录"
-                  >
-                    <MoveUp className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onMoveDown}
-                    disabled={!canMoveDown || moving}
-                    className="p-2 text-white/45 hover:text-white disabled:opacity-25"
-                    aria-label="下移记录"
-                  >
-                    <MoveDown className="w-4 h-4" />
-                  </button>
-                </div>
-                <button type="button" onClick={onEdit} className="p-2 rounded-xl text-white/45 hover:text-white hover:bg-white/10">
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                {canDelete && (
-                  <button type="button" onClick={onDelete} className="p-2 rounded-xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              <h3 className="text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">{entry.title}</h3>
             </div>
 
             {summary && <p className="mt-2 text-sm font-bold text-white/65">{summary}</p>}
@@ -1682,6 +1638,52 @@ function TimelineCard({
               }`}>
                 {entry.include_in_guide ? '进入攻略素材' : '不进入攻略'}
               </span>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+              <button
+                type="button"
+                disabled={moving}
+                {...attributes}
+                {...listeners}
+                className="inline-flex h-10 min-w-0 cursor-grab touch-none items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-black text-white/45 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
+                aria-label="拖拽排序"
+                title="拖拽排序"
+              >
+                <GripVertical className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">拖拽排序</span>
+              </button>
+
+              <div className="flex shrink-0 items-center gap-1.5">
+                <div className="flex rounded-2xl border border-white/10 bg-white/5">
+                  <button
+                    type="button"
+                    onClick={onMoveUp}
+                    disabled={!canMoveUp || moving}
+                    className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
+                    aria-label="上移记录"
+                  >
+                    <MoveUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onMoveDown}
+                    disabled={!canMoveDown || moving}
+                    className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
+                    aria-label="下移记录"
+                  >
+                    <MoveDown className="w-4 h-4" />
+                  </button>
+                </div>
+                <button type="button" onClick={onEdit} className="p-2.5 rounded-2xl text-white/45 hover:text-white hover:bg-white/10">
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                {canDelete && (
+                  <button type="button" onClick={onDelete} className="p-2.5 rounded-2xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

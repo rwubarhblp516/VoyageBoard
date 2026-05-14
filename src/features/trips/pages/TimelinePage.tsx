@@ -1,6 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -18,6 +35,7 @@ import {
   Clock3,
   Edit2,
   FileText,
+  GripVertical,
   Hotel,
   ImagePlus,
   Lightbulb,
@@ -676,6 +694,12 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   })
 
   const sortedEntries = useMemo(() => sortTimelineEntries(entries || []), [entries])
+  const sortableEntryIds = useMemo(() => sortedEntries.map((entry) => entry.id), [sortedEntries])
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 140, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   const updateForm = <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
@@ -1012,6 +1036,20 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     persistEntryOrder(nextEntries)
   }
 
+  const handleSortDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const sourceIndex = sortedEntries.findIndex((entry) => entry.id === active.id)
+    const targetIndex = sortedEntries.findIndex((entry) => entry.id === over.id)
+    if (sourceIndex < 0 || targetIndex < 0) return
+
+    const nextEntries = [...sortedEntries]
+    const [movedEntry] = nextEntries.splice(sourceIndex, 1)
+    nextEntries.splice(targetIndex, 0, movedEntry)
+    persistEntryOrder(nextEntries)
+  }
+
   const getKnownPoint = (
     name: string,
     address: string,
@@ -1156,7 +1194,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-sm font-black text-white">当天记录排序</h3>
-                <p className="mt-1 text-xs font-bold text-white/45">按时间整理后，还可以用每条记录右侧按钮微调。</p>
+                <p className="mt-1 text-xs font-bold text-white/45">拖动记录右侧手柄调整顺序，也可以按时间整理。</p>
               </div>
               <button
                 type="button"
@@ -1172,23 +1210,27 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
 
           <div className="relative space-y-4">
             <div className="absolute left-6 top-4 bottom-4 w-px bg-white/10 hidden sm:block" />
-            <AnimatePresence mode="popLayout">
-              {sortedEntries.map((entry, index) => (
-                <TimelineCard
-                  key={entry.id}
-                  entry={entry}
-                  index={index}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < sortedEntries.length - 1}
-                  moving={reordering}
-                  onMoveUp={() => handleMoveEntry(entry.id, -1)}
-                  onMoveDown={() => handleMoveEntry(entry.id, 1)}
-                  onEdit={() => openEditForm(entry)}
-                  onDelete={() => handleDelete(entry)}
-                  canDelete={entry.created_by_member_id === currentMember?.id || currentMember?.role === 'owner'}
-                />
-              ))}
-            </AnimatePresence>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortDragEnd}>
+              <SortableContext items={sortableEntryIds} strategy={verticalListSortingStrategy}>
+                <AnimatePresence mode="popLayout">
+                  {sortedEntries.map((entry, index) => (
+                    <TimelineCard
+                      key={entry.id}
+                      entry={entry}
+                      index={index}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < sortedEntries.length - 1}
+                      moving={reordering}
+                      onMoveUp={() => handleMoveEntry(entry.id, -1)}
+                      onMoveDown={() => handleMoveEntry(entry.id, 1)}
+                      onEdit={() => openEditForm(entry)}
+                      onDelete={() => handleDelete(entry)}
+                      canDelete={entry.created_by_member_id === currentMember?.id || currentMember?.role === 'owner'}
+                    />
+                  ))}
+                </AnimatePresence>
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       ) : (
@@ -1514,6 +1556,19 @@ function TimelineCard({
   const transportMeta = segment ? getTransportMeta(segment.transport_mode) : null
   const TransportIcon = transportMeta?.icon || Route
   const time = entry.start_time || segment?.departure_time
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entry.id, disabled: moving })
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 30 : undefined,
+  }
   const summary = entry.type === 'transport'
     ? [
         transportMeta?.label,
@@ -1528,11 +1583,13 @@ function TimelineCard({
 
   return (
     <motion.article
+      ref={setNodeRef}
+      style={sortableStyle}
       layout
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      animate={{ opacity: isDragging ? 0.55 : 1, y: 0, scale: isDragging ? 0.985 : 1 }}
       exit={{ opacity: 0, x: -20, scale: 0.98 }}
-      className="relative sm:pl-16"
+      className="relative touch-manipulation rounded-[30px] sm:pl-16"
     >
       <div className="absolute left-[15px] top-7 hidden h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-white text-black text-xs font-black sm:flex">
         {index + 1}
@@ -1555,6 +1612,17 @@ function TimelineCard({
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  disabled={moving}
+                  {...attributes}
+                  {...listeners}
+                  className="cursor-grab touch-none rounded-xl p-2 text-white/35 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
+                  aria-label="拖拽排序"
+                  title="拖拽排序"
+                >
+                  <GripVertical className="w-4 h-4" />
+                </button>
                 <div className="flex rounded-xl border border-white/10 bg-white/5">
                   <button
                     type="button"

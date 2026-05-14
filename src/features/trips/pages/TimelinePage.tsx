@@ -178,6 +178,10 @@ type EntryForm = {
 type QuickNoteForm = {
   content: string
   start_time: string
+  place_name: string
+  address: string
+  latitude: string
+  longitude: string
   include_in_guide: boolean
 }
 
@@ -464,6 +468,43 @@ const getLocationByKeyword = async (keyword: string): Promise<LocationPoint> => 
   })
 }
 
+const getLocationByCoordinates = async (latitude: number, longitude: number): Promise<LocationPoint> => {
+  const AMap = await loadAMapPlugin('AMap.Geocoder')
+  const geocoder = new AMap.Geocoder({ city: '全国' })
+  const lngLat = new AMap.LngLat(longitude, latitude)
+
+  return new Promise((resolve, reject) => {
+    geocoder.getAddress(lngLat, (status: string, result: any) => {
+      const regeocode = result?.regeocode
+      if (status === 'complete' && regeocode) {
+        const pois = Array.isArray(regeocode.pois) ? regeocode.pois : []
+        const firstPoi = pois[0]
+        resolve({
+          name: firstPoi?.name || regeocode.formattedAddress || '当前位置',
+          address: regeocode.formattedAddress || '',
+          latitude,
+          longitude,
+        })
+        return
+      }
+      reject(new Error(result?.info || '当前位置解析失败'))
+    })
+  })
+}
+
+const getBrowserLocation = () => new Promise<GeolocationPosition>((resolve, reject) => {
+  if (!navigator.geolocation) {
+    reject(new Error('当前浏览器不支持定位'))
+    return
+  }
+
+  navigator.geolocation.getCurrentPosition(resolve, reject, {
+    enableHighAccuracy: true,
+    timeout: 12000,
+    maximumAge: 60000,
+  })
+})
+
 const serializePolyline = (points: Array<[number, number]>) => JSON.stringify(points)
 
 const parsePolyline = (polyline?: string | null): Array<[number, number]> => {
@@ -628,11 +669,16 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [quickNoteForm, setQuickNoteForm] = useState<QuickNoteForm>({
     content: '',
     start_time: getCurrentTimeValue(),
+    place_name: '',
+    address: '',
+    latitude: '',
+    longitude: '',
     include_in_guide: true,
   })
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [quickSaving, setQuickSaving] = useState(false)
+  const [quickLocating, setQuickLocating] = useState(false)
   const [mapCalculating, setMapCalculating] = useState(false)
   const [reordering, setReordering] = useState(false)
 
@@ -753,6 +799,10 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setQuickNoteForm({
       content: '',
       start_time: getCurrentTimeValue(),
+      place_name: '',
+      address: '',
+      latitude: '',
+      longitude: '',
       include_in_guide: true,
     })
     setPendingImageFiles([])
@@ -806,6 +856,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setSaving(false)
     setMapCalculating(false)
     setQuickSaving(false)
+    setQuickLocating(false)
     setQuickNoteOpen(false)
   }
 
@@ -1036,6 +1087,10 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
           start_time: quickNoteForm.start_time || null,
           end_time: null,
           duration_minutes: null,
+          place_name: quickNoteForm.place_name.trim() || null,
+          address: quickNoteForm.address.trim() || null,
+          latitude: quickNoteForm.latitude.trim() ? Number(quickNoteForm.latitude) : null,
+          longitude: quickNoteForm.longitude.trim() ? Number(quickNoteForm.longitude) : null,
           recommend_level: 'normal',
           tags: [],
           sort_order: (entries?.length || 0) + 1,
@@ -1053,6 +1108,31 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     } catch (error: any) {
       alert(error.message || '快速记录保存失败')
       setQuickSaving(false)
+    }
+  }
+
+  const handleQuickLocate = async () => {
+    setQuickLocating(true)
+    try {
+      const position = await getBrowserLocation()
+      const location = await getLocationByCoordinates(
+        position.coords.latitude,
+        position.coords.longitude,
+      )
+      setQuickNoteForm((current) => ({
+        ...current,
+        place_name: location.name,
+        address: location.address,
+        latitude: String(location.latitude),
+        longitude: String(location.longitude),
+      }))
+    } catch (error: any) {
+      const message = error?.code === 1
+        ? '定位权限被拒绝，请在浏览器里允许定位'
+        : error?.message || '定位失败'
+      alert(message)
+    } finally {
+      setQuickLocating(false)
     }
   }
 
@@ -1423,7 +1503,9 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               form={quickNoteForm}
               saving={quickSaving}
               pendingImageFiles={pendingImageFiles}
+              locating={quickLocating}
               onChange={(nextForm) => setQuickNoteForm(nextForm)}
+              onLocate={handleQuickLocate}
               onClose={closeForm}
               onSave={handleQuickSave}
               onSelectImages={handleSelectImages}
@@ -2317,7 +2399,9 @@ function QuickNoteModal({
   form,
   saving,
   pendingImageFiles,
+  locating,
   onChange,
+  onLocate,
   onClose,
   onSave,
   onSelectImages,
@@ -2326,20 +2410,22 @@ function QuickNoteModal({
   form: QuickNoteForm
   saving: boolean
   pendingImageFiles: File[]
+  locating: boolean
   onChange: (form: QuickNoteForm) => void
+  onLocate: () => void
   onClose: () => void
   onSave: (event: React.FormEvent) => void
   onSelectImages: (files: FileList | null) => void
   onRemovePendingImage: (index: number) => void
 }) {
   return (
-    <div className="fixed inset-0 z-[90] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-black/65 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto overscroll-contain bg-black/65 p-3 pt-[max(16px,env(safe-area-inset-top))] backdrop-blur-sm sm:items-center sm:p-6">
       <motion.form
         onSubmit={onSave}
         initial={{ opacity: 0, y: 42, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 32, scale: 0.98 }}
-        className="my-auto max-h-[calc(100vh-24px)] w-full max-w-xl overflow-y-auto overscroll-contain glass-card rounded-[28px] border border-white/10 p-5 shadow-2xl sm:max-h-[88vh] sm:rounded-[32px] sm:p-6"
+        className="mb-3 mt-0 max-h-[calc(100dvh-32px)] w-full max-w-xl overflow-y-auto overscroll-contain glass-card rounded-[28px] border border-white/10 p-5 shadow-2xl sm:my-auto sm:max-h-[88vh] sm:rounded-[32px] sm:p-6"
       >
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
@@ -2372,6 +2458,28 @@ function QuickNoteModal({
             </Field>
             <GuideToggle checked={form.include_in_guide} onChange={(checked) => onChange({ ...form, include_in_guide: checked })} />
           </div>
+
+          <section className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  当前位置
+                </h3>
+                <p className="mt-1 line-clamp-2 text-xs font-bold text-white/45">
+                  {form.place_name ? `${form.place_name}${form.address ? ` · ${form.address}` : ''}` : '点击后会请求浏览器定位，并写入这条快速记录。'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onLocate}
+                disabled={locating}
+                className="shrink-0 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-xs font-black text-white hover:bg-white/15 disabled:opacity-40"
+              >
+                {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : '定位'}
+              </button>
+            </div>
+          </section>
 
           <ImageUploadSection
             existingImages={[]}

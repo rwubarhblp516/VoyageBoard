@@ -2333,13 +2333,13 @@ function QuickNoteModal({
   onRemovePendingImage: (index: number) => void
 }) {
   return (
-    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6">
+    <div className="fixed inset-0 z-[90] flex items-stretch justify-center overflow-y-auto overscroll-contain bg-black/65 p-3 backdrop-blur-sm sm:items-center sm:p-6">
       <motion.form
         onSubmit={onSave}
         initial={{ opacity: 0, y: 42, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 32, scale: 0.98 }}
-        className="w-full max-w-xl glass-card rounded-[32px] border border-white/10 p-5 sm:p-6 shadow-2xl"
+        className="my-auto max-h-[calc(100vh-24px)] w-full max-w-xl overflow-y-auto overscroll-contain glass-card rounded-[28px] border border-white/10 p-5 shadow-2xl sm:max-h-[88vh] sm:rounded-[32px] sm:p-6"
       >
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
@@ -2365,11 +2365,9 @@ function QuickNoteModal({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="时间">
-              <input
-                type="time"
+              <TimeInput
                 value={form.start_time}
-                onChange={(event) => onChange({ ...form, start_time: event.target.value })}
-                className="glass-input"
+                onChange={(value) => onChange({ ...form, start_time: value })}
               />
             </Field>
             <GuideToggle checked={form.include_in_guide} onChange={(checked) => onChange({ ...form, include_in_guide: checked })} />
@@ -2499,6 +2497,20 @@ function LocationSearchInput({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function TimeInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="relative">
+      <input
+        type="time"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="glass-input pr-12 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
+      />
+      <Clock3 className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
     </div>
   )
 }

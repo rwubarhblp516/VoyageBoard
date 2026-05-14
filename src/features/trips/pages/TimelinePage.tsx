@@ -1752,6 +1752,7 @@ function TimelineCard({
   const transportMeta = segment ? getTransportMeta(segment.transport_mode) : null
   const TransportIcon = transportMeta?.icon || Route
   const time = entry.start_time || segment?.departure_time
+  const arrivalTime = entry.type === 'transport' ? (entry.end_time || segment?.arrival_time) : null
   const {
     attributes,
     listeners,
@@ -1795,9 +1796,42 @@ function TimelineCard({
           <div className="min-w-0">
             {entry.type === 'transport' && segment ? (
               <>
-                <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
-                  <span className="text-[11px] font-black text-white/35">{meta.label}</span>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}{arrivalTime ? ` → ${formatTime(arrivalTime)}` : ''}</span>
+                    <span className="text-[11px] font-black text-white/35">{meta.label}</span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={moving}
+                      {...attributes}
+                      {...listeners}
+                      className="hidden sm:inline-flex h-7 w-7 cursor-grab touch-none items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
+                      aria-label="拖拽排序"
+                      title="拖拽排序"
+                    >
+                      <GripVertical className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onMoveUp}
+                      disabled={!canMoveUp || moving}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-25"
+                      aria-label="上移"
+                    >
+                      <MoveUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onMoveDown}
+                      disabled={!canMoveDown || moving}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-25"
+                      aria-label="下移"
+                    >
+                      <MoveDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="grid gap-1.5">
                   <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -1823,12 +1857,45 @@ function TimelineCard({
               </>
             ) : (
               <>
-                <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                  <div className={`inline-flex h-6 w-6 items-center justify-center rounded-lg border ${meta.tone}`}>
-                    <Icon className="w-3.5 h-3.5" />
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className={`inline-flex h-6 w-6 items-center justify-center rounded-lg border ${meta.tone}`}>
+                      <Icon className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
+                    <span className="text-[11px] font-black text-white/35">{meta.label}</span>
                   </div>
-                  <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
-                  <span className="text-[11px] font-black text-white/35">{meta.label}</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={moving}
+                      {...attributes}
+                      {...listeners}
+                      className="hidden sm:inline-flex h-7 w-7 cursor-grab touch-none items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
+                      aria-label="拖拽排序"
+                      title="拖拽排序"
+                    >
+                      <GripVertical className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onMoveUp}
+                      disabled={!canMoveUp || moving}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-25"
+                      aria-label="上移"
+                    >
+                      <MoveUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onMoveDown}
+                      disabled={!canMoveDown || moving}
+                      className="h-7 w-7 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-25"
+                      aria-label="下移"
+                    >
+                      <MoveDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <h3 className="text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">{entry.title}</h3>
               </>
@@ -1865,50 +1932,15 @@ function TimelineCard({
             </span>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-            <button
-              type="button"
-              disabled={moving}
-              {...attributes}
-              {...listeners}
-              className="inline-flex h-10 min-w-0 cursor-grab touch-none items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-black text-white/45 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
-              aria-label="拖拽排序"
-              title="拖拽排序"
-            >
-              <GripVertical className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">拖拽排序</span>
+          <div className="mt-4 flex items-center justify-end gap-1.5 border-t border-white/10 pt-3">
+            <button type="button" onClick={onEdit} className="p-2.5 rounded-2xl text-white/45 hover:text-white hover:bg-white/10">
+              <Edit2 className="w-4 h-4" />
             </button>
-
-            <div className="flex shrink-0 items-center gap-1.5">
-              <div className="flex rounded-2xl border border-white/10 bg-white/5">
-                <button
-                  type="button"
-                  onClick={onMoveUp}
-                  disabled={!canMoveUp || moving}
-                  className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
-                  aria-label="上移记录"
-                >
-                  <MoveUp className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onMoveDown}
-                  disabled={!canMoveDown || moving}
-                  className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
-                  aria-label="下移记录"
-                >
-                  <MoveDown className="w-4 h-4" />
-                </button>
-              </div>
-              <button type="button" onClick={onEdit} className="p-2.5 rounded-2xl text-white/45 hover:text-white hover:bg-white/10">
-                <Edit2 className="w-4 h-4" />
+            {canDelete && (
+              <button type="button" onClick={onDelete} className="p-2.5 rounded-2xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
+                <Trash2 className="w-4 h-4" />
               </button>
-              {canDelete && (
-                <button type="button" onClick={onDelete} className="p-2.5 rounded-2xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            )}
           </div>
         </div>
     </motion.article>

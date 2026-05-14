@@ -38,6 +38,7 @@ import {
   GripVertical,
   Hotel,
   ImagePlus,
+  ListPlus,
   Lightbulb,
   Loader2,
   MapPin,
@@ -174,6 +175,12 @@ type EntryForm = {
   include_in_guide: boolean
 }
 
+type QuickNoteForm = {
+  content: string
+  start_time: string
+  include_in_guide: boolean
+}
+
 type LocationPoint = {
   name: string
   address: string
@@ -286,6 +293,11 @@ const formatDateLabel = (dateText: string) => {
 }
 
 const formatTime = (time?: string | null) => time ? time.slice(0, 5) : '--:--'
+
+const getCurrentTimeValue = () => {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
 
 const calculateDuration = (start?: string, end?: string) => {
   if (!start || !end) return null
@@ -610,10 +622,17 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [activeDayIndex, setActiveDayIndex] = useState(1)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
+  const [quickNoteOpen, setQuickNoteOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<TimelineEntry | null>(null)
   const [form, setForm] = useState<EntryForm>(emptyForm('transport'))
+  const [quickNoteForm, setQuickNoteForm] = useState<QuickNoteForm>({
+    content: '',
+    start_time: getCurrentTimeValue(),
+    include_in_guide: true,
+  })
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
+  const [quickSaving, setQuickSaving] = useState(false)
   const [mapCalculating, setMapCalculating] = useState(false)
   const [reordering, setReordering] = useState(false)
 
@@ -716,11 +735,30 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   }
 
   const openNewForm = (type: TimelineEntryType) => {
-    setForm(emptyForm(type))
+    const nextForm = emptyForm(type)
+    const currentTime = getCurrentTimeValue()
+    if (type === 'transport') {
+      nextForm.departure_time = currentTime
+    } else {
+      nextForm.start_time = currentTime
+    }
+    setForm(nextForm)
     setPendingImageFiles([])
     setEditingEntry(null)
     setPickerOpen(false)
     setFormOpen(true)
+  }
+
+  const openQuickNote = () => {
+    setQuickNoteForm({
+      content: '',
+      start_time: getCurrentTimeValue(),
+      include_in_guide: true,
+    })
+    setPendingImageFiles([])
+    setPickerOpen(false)
+    setEditingEntry(null)
+    setQuickNoteOpen(true)
   }
 
   const openEditForm = (entry: TimelineEntry) => {
@@ -767,6 +805,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setPendingImageFiles([])
     setSaving(false)
     setMapCalculating(false)
+    setQuickSaving(false)
+    setQuickNoteOpen(false)
   }
 
   const buildEntryPayload = () => {
@@ -965,6 +1005,54 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     } catch (error: any) {
       alert(error.message)
       setSaving(false)
+    }
+  }
+
+  const handleQuickSave = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!activeDay || !currentMember) {
+      alert('日期或成员信息还没有准备好')
+      return
+    }
+
+    const content = quickNoteForm.content.trim()
+    if (!content) {
+      alert('写一句内容就可以保存')
+      return
+    }
+
+    setQuickSaving(true)
+
+    try {
+      const title = content.length > 22 ? `${content.slice(0, 22)}...` : content
+      const { data, error } = await supabase
+        .from('timeline_entries')
+        .insert({
+          trip_id: currentTrip.id,
+          day_id: activeDay.id,
+          type: 'note',
+          title,
+          content,
+          start_time: quickNoteForm.start_time || null,
+          end_time: null,
+          duration_minutes: null,
+          recommend_level: 'normal',
+          tags: [],
+          sort_order: (entries?.length || 0) + 1,
+          created_by_member_id: currentMember.id,
+          include_in_guide: quickNoteForm.include_in_guide,
+          updated_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (error) throw error
+      await uploadPendingImages(data.id)
+      await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
+      closeForm()
+    } catch (error: any) {
+      alert(error.message || '快速记录保存失败')
+      setQuickSaving(false)
     }
   }
 
@@ -1243,17 +1331,30 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         </div>
       )}
 
-      <motion.button
-        type="button"
-        whileHover={{ scale: 1.04 }}
-        whileTap={{ scale: 0.96 }}
-        onClick={() => setPickerOpen(true)}
-        disabled={!activeDay}
-        className="fixed left-1/2 bottom-32 z-50 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-white px-6 text-black shadow-[0_18px_40px_rgba(0,0,0,0.35)] disabled:opacity-50"
-      >
-        <Plus className="w-5 h-5" strokeWidth={3} />
-        <span className="text-sm font-black tracking-widest">添加记录</span>
-      </motion.button>
+      <div className="fixed left-1/2 bottom-32 z-50 flex -translate-x-1/2 items-center gap-3">
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={openQuickNote}
+          disabled={!activeDay}
+          className="flex h-14 items-center gap-3 rounded-full bg-white px-5 text-black shadow-[0_18px_40px_rgba(0,0,0,0.35)] disabled:opacity-50"
+        >
+          <ListPlus className="w-5 h-5" strokeWidth={3} />
+          <span className="text-sm font-black tracking-widest">快速记</span>
+        </motion.button>
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => setPickerOpen(true)}
+          disabled={!activeDay}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-black/70 text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] border border-white/15 disabled:opacity-50"
+          aria-label="添加完整记录"
+        >
+          <Plus className="w-5 h-5" strokeWidth={3} />
+        </motion.button>
+      </div>
 
       <ModalPortal>
         <AnimatePresence>
@@ -1314,6 +1415,19 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               onSelectImages={handleSelectImages}
               onRemovePendingImage={handleRemovePendingImage}
               onDeleteImage={handleDeleteImage}
+            />
+          )}
+
+          {quickNoteOpen && (
+            <QuickNoteModal
+              form={quickNoteForm}
+              saving={quickSaving}
+              pendingImageFiles={pendingImageFiles}
+              onChange={(nextForm) => setQuickNoteForm(nextForm)}
+              onClose={closeForm}
+              onSave={handleQuickSave}
+              onSelectImages={handleSelectImages}
+              onRemovePendingImage={handleRemovePendingImage}
             />
           )}
         </AnimatePresence>
@@ -2178,6 +2292,99 @@ function EntryFormModal({
         />
 
         <div className="mt-7 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-12 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 font-black"
+          >
+            取消
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="h-12 rounded-2xl bg-white text-black disabled:bg-white/20 disabled:text-white/35 font-black flex items-center justify-center gap-2"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            保存
+          </button>
+        </div>
+      </motion.form>
+    </div>
+  )
+}
+
+function QuickNoteModal({
+  form,
+  saving,
+  pendingImageFiles,
+  onChange,
+  onClose,
+  onSave,
+  onSelectImages,
+  onRemovePendingImage,
+}: {
+  form: QuickNoteForm
+  saving: boolean
+  pendingImageFiles: File[]
+  onChange: (form: QuickNoteForm) => void
+  onClose: () => void
+  onSave: (event: React.FormEvent) => void
+  onSelectImages: (files: FileList | null) => void
+  onRemovePendingImage: (index: number) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-sm p-4 sm:p-6">
+      <motion.form
+        onSubmit={onSave}
+        initial={{ opacity: 0, y: 42, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 32, scale: 0.98 }}
+        className="w-full max-w-xl glass-card rounded-[32px] border border-white/10 p-5 sm:p-6 shadow-2xl"
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-[0.28em] text-white/45">QUICK NOTE</span>
+            <h2 className="mt-1 text-2xl font-black text-white tracking-tight">快速记一下</h2>
+          </div>
+          <button type="button" onClick={onClose} className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <Field label="内容">
+            <textarea
+              value={form.content}
+              onChange={(event) => onChange({ ...form, content: event.target.value })}
+              placeholder="例如：这个停车场离入口很远，别停这里"
+              rows={5}
+              autoFocus
+              className="glass-input resize-none text-base leading-7"
+            />
+          </Field>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="时间">
+              <input
+                type="time"
+                value={form.start_time}
+                onChange={(event) => onChange({ ...form, start_time: event.target.value })}
+                className="glass-input"
+              />
+            </Field>
+            <GuideToggle checked={form.include_in_guide} onChange={(checked) => onChange({ ...form, include_in_guide: checked })} />
+          </div>
+
+          <ImageUploadSection
+            existingImages={[]}
+            pendingImageFiles={pendingImageFiles}
+            onSelectImages={onSelectImages}
+            onRemovePendingImage={onRemovePendingImage}
+            onDeleteImage={() => undefined}
+          />
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={onClose}

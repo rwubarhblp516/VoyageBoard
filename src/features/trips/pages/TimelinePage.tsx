@@ -167,6 +167,11 @@ type RouteCalculationResult = {
   routePolyline: string
 }
 
+type MapStyleOption = {
+  value: string
+  label: string
+}
+
 declare global {
   interface Window {
     AMap?: any
@@ -202,6 +207,13 @@ const transportModes: Array<{ value: string; label: string; icon: React.ElementT
   { value: 'ship', label: '轮船', icon: Ship },
   { value: 'ferry', label: '轮渡', icon: Ship },
   { value: 'other', label: '其他', icon: Route },
+]
+
+const mapStyleOptions: MapStyleOption[] = [
+  { value: 'amap://styles/normal', label: '标准' },
+  { value: 'amap://styles/fresh', label: '清爽' },
+  { value: 'amap://styles/whitesmoke', label: '浅灰' },
+  { value: 'amap://styles/dark', label: '深色' },
 ]
 
 const emptyForm = (type: TimelineEntryType): EntryForm => ({
@@ -1155,6 +1167,7 @@ function ModalPortal({ children }: { children: React.ReactNode }) {
 function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[]; activeDateLabel: string }) {
   const [containerId] = useState(() => `daily-route-map-${crypto.randomUUID()}`)
   const [mapError, setMapError] = useState('')
+  const [mapStyle, setMapStyle] = useState(mapStyleOptions[0].value)
 
   const mapPoints = useMemo(() => {
     const points: Array<{ name: string; address?: string | null; longitude: number; latitude: number; type: TimelineEntryType }> = []
@@ -1215,7 +1228,7 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
           viewMode: '2D',
           zoom: 11,
           center: [mapPoints[0].longitude, mapPoints[0].latitude],
-          mapStyle: 'amap://styles/whitesmoke',
+          mapStyle,
           showLabel: true,
           resizeEnable: true,
         })
@@ -1224,15 +1237,13 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
           position: [point.longitude, point.latitude],
           anchor: 'bottom-center',
           title: point.name,
-          offset: new AMap.Pixel(0, 0),
+          offset: new AMap.Pixel(0, -2),
           content: `
-            <div style="position:relative;width:34px;height:42px;filter:drop-shadow(0 14px 18px rgba(0,0,0,.28));">
-              <div style="position:absolute;left:4px;top:0;width:26px;height:26px;border-radius:999px;background:linear-gradient(135deg,#111827,#0ea5e9 62%,#67e8f9);border:2px solid rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:900;box-shadow:0 8px 22px rgba(14,165,233,.35);">
-                ${index + 1}
-              </div>
-              <div style="position:absolute;left:14px;top:23px;width:7px;height:14px;border-radius:999px;background:linear-gradient(180deg,#0ea5e9,#111827);transform:rotate(28deg);border:1px solid rgba(255,255,255,.45);"></div>
-              <div style="position:absolute;left:10px;bottom:0;width:14px;height:4px;border-radius:999px;background:rgba(15,23,42,.28);filter:blur(1px);"></div>
-            </div>
+            <svg width="34" height="43" viewBox="0 0 34 43" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 10px 14px rgba(15,23,42,.28));">
+              <path d="M17 41C17 41 30 25.6 30 14.8C30 6.6 24.2 1 17 1C9.8 1 4 6.6 4 14.8C4 25.6 17 41 17 41Z" fill="#0EA5E9" stroke="white" stroke-width="2"/>
+              <path d="M17 37C17 37 27 24.4 27 15C27 8.6 22.5 4 17 4C11.5 4 7 8.6 7 15C7 24.4 17 37 17 37Z" fill="#0284C7"/>
+              <text x="17" y="20.2" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="900">${index + 1}</text>
+            </svg>
           `,
         }))
         map.add(markers)
@@ -1274,7 +1285,7 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
       disposed = true
       if (map) map.destroy()
     }
-  }, [containerId, entries, mapPoints])
+  }, [containerId, entries, mapPoints, mapStyle])
 
   if (mapPoints.length === 0) {
     return (
@@ -1291,24 +1302,38 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   }
 
   return (
-    <section className="mb-6 overflow-hidden rounded-[30px] border border-white/10 bg-zinc-950/35 shadow-lg backdrop-blur-xl">
-      <div className="flex items-center justify-between gap-3 px-5 py-4">
+    <section className="mb-6 overflow-hidden rounded-[30px] border border-white/10 bg-white/8 shadow-lg backdrop-blur-xl">
+      <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-black text-white">今日地图</h3>
           <p className="mt-1 text-xs font-bold text-white/45">{activeDateLabel} · {mapPoints.length} 个点位</p>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/8 p-2 text-white/55">
-          <MapPinned className="h-5 w-5" />
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          {mapStyleOptions.map((option) => {
+            const isActive = option.value === mapStyle
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setMapStyle(option.value)}
+                className={`shrink-0 rounded-full border px-3 py-2 text-xs font-black transition-all ${
+                  isActive
+                    ? 'border-white bg-white text-black'
+                    : 'border-white/10 bg-black/15 text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {option.label}
+              </button>
+            )
+          })}
         </div>
       </div>
-      <div className="relative mx-3 mb-3 overflow-hidden rounded-[24px] border border-white/10 bg-slate-100">
+      <div className="relative mx-3 mb-3 overflow-hidden rounded-[24px] border border-white/10 bg-white">
         <div id={containerId} className="h-[280px] w-full sm:h-[360px]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/25 to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />
         <div className="pointer-events-none absolute left-3 right-3 bottom-3 flex gap-2 overflow-hidden">
           {mapPoints.slice(0, 5).map((point, index) => (
-            <div key={`${point.name}-${point.longitude}-${point.latitude}-chip`} className="min-w-0 max-w-[160px] rounded-full border border-white/25 bg-zinc-950/70 px-3 py-2 text-xs font-black text-white shadow-lg backdrop-blur-md">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-400 text-[10px] text-black">
+            <div key={`${point.name}-${point.longitude}-${point.latitude}-chip`} className="min-w-0 max-w-[160px] rounded-full border border-black/5 bg-white/90 px-3 py-2 text-xs font-black text-slate-900 shadow-lg backdrop-blur-md">
+              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-[10px] text-white">
                 {index + 1}
               </span>
               <span className="align-middle">{point.name}</span>

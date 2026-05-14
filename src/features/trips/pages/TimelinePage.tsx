@@ -1785,9 +1785,9 @@ function TimelineCard({
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: isDragging ? 0.55 : 1, y: 0, scale: isDragging ? 0.985 : 1 }}
       exit={{ opacity: 0, x: -20, scale: 0.98 }}
-      className="relative touch-manipulation rounded-[30px] sm:pl-16"
+      className="relative touch-manipulation rounded-[30px] pl-10 sm:pl-16"
     >
-      <div className="absolute left-[15px] top-7 hidden h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-white text-black text-xs font-black sm:flex">
+      <div className="absolute left-4 top-7 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-white text-black text-[11px] font-black shadow-lg shadow-black/20 sm:left-[15px] sm:h-8 sm:w-8 sm:text-xs">
         {index + 1}
       </div>
 
@@ -1803,7 +1803,29 @@ function TimelineCard({
                 <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
                 <span className="text-[11px] font-black text-white/35">{meta.label}</span>
               </div>
-              <h3 className="text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">{entry.title}</h3>
+              {entry.type === 'transport' && segment ? (
+                <div className="mt-1 grid gap-1.5">
+                  <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                    <p className="text-[10px] font-black text-white/35">出发地</p>
+                    <h3 className="mt-0.5 text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">
+                      {segment.origin_name}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 text-sky-100/75">
+                    <span className="h-px flex-1 bg-white/10" />
+                    <span className="text-sm font-black">→</span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                    <p className="text-[10px] font-black text-white/35">目的地</p>
+                    <h3 className="mt-0.5 text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">
+                      {segment.destination_name}
+                    </h3>
+                  </div>
+                </div>
+              ) : (
+                <h3 className="text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">{entry.title}</h3>
+              )}
             </div>
 
             {summary && <p className="mt-2 text-sm font-bold text-white/65">{summary}</p>}

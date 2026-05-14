@@ -5,6 +5,7 @@ import { Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertTriangle,
+  ArrowUpDown,
   Bike,
   Bus,
   Camera,
@@ -23,6 +24,10 @@ import {
   Loader2,
   MapPin,
   MapPinned,
+  Maximize2,
+  Minimize2,
+  MoveDown,
+  MoveUp,
   Newspaper,
   Navigation,
   Plane,
@@ -282,6 +287,42 @@ const formatDuration = (minutes?: number | null) => {
   const rest = minutes % 60
   return rest ? `${hours}小时${rest}分钟` : `${hours}小时`
 }
+
+const timeToMinutes = (time?: string | null) => {
+  if (!time) return null
+  const [hours, minutes] = time.slice(0, 5).split(':').map(Number)
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null
+  return hours * 60 + minutes
+}
+
+const getEntrySortMinutes = (entry: TimelineEntry) => (
+  timeToMinutes(entry.start_time || entry.travel_segments?.[0]?.departure_time)
+)
+
+const sortTimelineEntries = (items: TimelineEntry[]) => (
+  [...items].sort((a, b) => {
+    const orderDiff = (a.sort_order || 0) - (b.sort_order || 0)
+    if (orderDiff !== 0) return orderDiff
+
+    const aMinutes = getEntrySortMinutes(a)
+    const bMinutes = getEntrySortMinutes(b)
+    if (aMinutes !== null && bMinutes !== null && aMinutes !== bMinutes) return aMinutes - bMinutes
+    if (aMinutes !== null && bMinutes === null) return -1
+    if (aMinutes === null && bMinutes !== null) return 1
+    return a.title.localeCompare(b.title)
+  })
+)
+
+const sortEntriesByTime = (items: TimelineEntry[]) => (
+  [...items].sort((a, b) => {
+    const aMinutes = getEntrySortMinutes(a)
+    const bMinutes = getEntrySortMinutes(b)
+    if (aMinutes !== null && bMinutes !== null && aMinutes !== bMinutes) return aMinutes - bMinutes
+    if (aMinutes !== null && bMinutes === null) return -1
+    if (aMinutes === null && bMinutes !== null) return 1
+    return (a.sort_order || 0) - (b.sort_order || 0)
+  })
+)
 
 const getEntryMeta = (type: TimelineEntryType) => entryTypes.find((entryType) => entryType.value === type) || entryTypes[0]
 
@@ -556,6 +597,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [mapCalculating, setMapCalculating] = useState(false)
+  const [reordering, setReordering] = useState(false)
 
   const expectedDays = useMemo(
     () => buildExpectedDays(currentTrip.start_date, currentTrip.end_date),
@@ -632,6 +674,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     },
     enabled: !!activeDay,
   })
+
+  const sortedEntries = useMemo(() => sortTimelineEntries(entries || []), [entries])
 
   const updateForm = <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
@@ -917,6 +961,57 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
   }
 
+  const persistEntryOrder = async (orderedEntries: TimelineEntry[]) => {
+    if (!activeDay) return
+    setReordering(true)
+    try {
+      const entryResults = await Promise.all(orderedEntries.map((entry, index) => (
+        supabase
+          .from('timeline_entries')
+          .update({ sort_order: index + 1 })
+          .eq('id', entry.id)
+      )))
+      const entryError = entryResults.find((result) => result.error)?.error
+      if (entryError) throw entryError
+
+      const segmentUpdates = orderedEntries
+        .filter((entry) => entry.type === 'transport')
+        .map((entry, index) => (
+          supabase
+            .from('travel_segments')
+            .update({ sort_order: index + 1 })
+            .eq('timeline_entry_id', entry.id)
+        ))
+
+      const segmentResults = await Promise.all(segmentUpdates)
+      const segmentError = segmentResults.find((result) => result.error)?.error
+      if (segmentError) throw segmentError
+
+      await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
+    } catch (error: any) {
+      alert(error.message || '排序保存失败')
+    } finally {
+      setReordering(false)
+    }
+  }
+
+  const handleAutoSortEntries = () => {
+    if (sortedEntries.length < 2) return
+    persistEntryOrder(sortEntriesByTime(sortedEntries))
+  }
+
+  const handleMoveEntry = (entryId: string, direction: -1 | 1) => {
+    const currentIndex = sortedEntries.findIndex((entry) => entry.id === entryId)
+    const nextIndex = currentIndex + direction
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= sortedEntries.length) return
+
+    const nextEntries = [...sortedEntries]
+    const currentEntry = nextEntries[currentIndex]
+    nextEntries[currentIndex] = nextEntries[nextIndex]
+    nextEntries[nextIndex] = currentEntry
+    persistEntryOrder(nextEntries)
+  }
+
   const getKnownPoint = (
     name: string,
     address: string,
@@ -1047,29 +1142,54 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         </div>
       </div>
 
-      {entries && entries.length > 0 && (
-        <DailyRouteMap entries={entries} activeDateLabel={formatDateLabel(activeDateLabel)} />
+      {sortedEntries.length > 0 && (
+        <DailyRouteMap entries={sortedEntries} activeDateLabel={formatDateLabel(activeDateLabel)} />
       )}
 
       {daysLoading || entriesLoading ? (
         <div className="flex items-center justify-center py-32">
           <Loader2 className="w-10 h-10 animate-spin text-white/20" />
         </div>
-      ) : entries && entries.length > 0 ? (
-        <div className="relative space-y-4">
-          <div className="absolute left-6 top-4 bottom-4 w-px bg-white/10 hidden sm:block" />
-          <AnimatePresence mode="popLayout">
-            {entries.map((entry, index) => (
-              <TimelineCard
-                key={entry.id}
-                entry={entry}
-                index={index}
-                onEdit={() => openEditForm(entry)}
-                onDelete={() => handleDelete(entry)}
-                canDelete={entry.created_by_member_id === currentMember?.id || currentMember?.role === 'owner'}
-              />
-            ))}
-          </AnimatePresence>
+      ) : sortedEntries.length > 0 ? (
+        <div className="space-y-4">
+          <div className="glass-card rounded-[24px] border border-white/10 p-3 sm:p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-black text-white">当天记录排序</h3>
+                <p className="mt-1 text-xs font-bold text-white/45">按时间整理后，还可以用每条记录右侧按钮微调。</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAutoSortEntries}
+                disabled={reordering || sortedEntries.length < 2}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-black text-white hover:bg-white/15 disabled:opacity-40"
+              >
+                {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpDown className="h-4 w-4" />}
+                按时间整理
+              </button>
+            </div>
+          </div>
+
+          <div className="relative space-y-4">
+            <div className="absolute left-6 top-4 bottom-4 w-px bg-white/10 hidden sm:block" />
+            <AnimatePresence mode="popLayout">
+              {sortedEntries.map((entry, index) => (
+                <TimelineCard
+                  key={entry.id}
+                  entry={entry}
+                  index={index}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < sortedEntries.length - 1}
+                  moving={reordering}
+                  onMoveUp={() => handleMoveEntry(entry.id, -1)}
+                  onMoveDown={() => handleMoveEntry(entry.id, 1)}
+                  onEdit={() => openEditForm(entry)}
+                  onDelete={() => handleDelete(entry)}
+                  canDelete={entry.created_by_member_id === currentMember?.id || currentMember?.role === 'owner'}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
       ) : (
         <div className="text-center py-28 bg-black/15 backdrop-blur-xl rounded-[40px] border-dashed border-2 border-white/20 shadow-lg">
@@ -1168,6 +1288,7 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   const [containerId] = useState(() => `daily-route-map-${crypto.randomUUID()}`)
   const [mapError, setMapError] = useState('')
   const [mapStyle, setMapStyle] = useState(mapStyleOptions[0].value)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const mapPoints = useMemo(() => {
     const points: Array<{ name: string; address?: string | null; longitude: number; latitude: number; type: TimelineEntryType }> = []
@@ -1285,7 +1406,7 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
       disposed = true
       if (map) map.destroy()
     }
-  }, [containerId, entries, mapPoints, mapStyle])
+  }, [containerId, entries, isFullscreen, mapPoints, mapStyle])
 
   if (mapPoints.length === 0) {
     return (
@@ -1302,34 +1423,48 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   }
 
   return (
-    <section className="mb-6 overflow-hidden rounded-[30px] border border-white/10 bg-white/8 shadow-lg backdrop-blur-xl">
+    <section className={`overflow-hidden border border-white/10 bg-white/8 shadow-lg backdrop-blur-xl ${
+      isFullscreen
+        ? 'fixed inset-0 z-[120] m-0 rounded-none bg-zinc-950/95 p-3 sm:p-5'
+        : 'mb-6 rounded-[30px]'
+    }`}>
       <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-black text-white">今日地图</h3>
           <p className="mt-1 text-xs font-bold text-white/45">{activeDateLabel} · {mapPoints.length} 个点位</p>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          {mapStyleOptions.map((option) => {
-            const isActive = option.value === mapStyle
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setMapStyle(option.value)}
-                className={`shrink-0 rounded-full border px-3 py-2 text-xs font-black transition-all ${
-                  isActive
-                    ? 'border-white bg-white text-black'
-                    : 'border-white/10 bg-black/15 text-white/60 hover:bg-white/10 hover:text-white'
-                }`}
-              >
-                {option.label}
-              </button>
-            )
-          })}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            {mapStyleOptions.map((option) => {
+              const isActive = option.value === mapStyle
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setMapStyle(option.value)}
+                  className={`shrink-0 rounded-full border px-3 py-2 text-xs font-black transition-all ${
+                    isActive
+                      ? 'border-white bg-white text-black'
+                      : 'border-white/10 bg-black/15 text-white/60 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsFullscreen((value) => !value)}
+            className="shrink-0 rounded-full border border-white/10 bg-black/15 p-2.5 text-white/65 hover:bg-white/10 hover:text-white"
+            aria-label={isFullscreen ? '退出全屏地图' : '全屏查看地图'}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
         </div>
       </div>
       <div className="relative mx-3 mb-3 overflow-hidden rounded-[24px] border border-white/10 bg-white">
-        <div id={containerId} className="h-[280px] w-full sm:h-[360px]" />
+        <div id={containerId} className={`${isFullscreen ? 'h-[calc(100vh-156px)] sm:h-[calc(100vh-150px)]' : 'h-[280px] sm:h-[360px]'} w-full`} />
         <div className="pointer-events-none absolute left-3 right-3 bottom-3 flex gap-2 overflow-hidden">
           {mapPoints.slice(0, 5).map((point, index) => (
             <div key={`${point.name}-${point.longitude}-${point.latitude}-chip`} className="min-w-0 max-w-[160px] rounded-full border border-black/5 bg-white/90 px-3 py-2 text-xs font-black text-slate-900 shadow-lg backdrop-blur-md">
@@ -1353,12 +1488,22 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
 function TimelineCard({
   entry,
   index,
+  canMoveUp,
+  canMoveDown,
+  moving,
+  onMoveUp,
+  onMoveDown,
   onEdit,
   onDelete,
   canDelete,
 }: {
   entry: TimelineEntry
   index: number
+  canMoveUp: boolean
+  canMoveDown: boolean
+  moving: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
   onEdit: () => void
   onDelete: () => void
   canDelete: boolean
@@ -1410,6 +1555,26 @@ function TimelineCard({
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
+                <div className="flex rounded-xl border border-white/10 bg-white/5">
+                  <button
+                    type="button"
+                    onClick={onMoveUp}
+                    disabled={!canMoveUp || moving}
+                    className="p-2 text-white/45 hover:text-white disabled:opacity-25"
+                    aria-label="上移记录"
+                  >
+                    <MoveUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onMoveDown}
+                    disabled={!canMoveDown || moving}
+                    className="p-2 text-white/45 hover:text-white disabled:opacity-25"
+                    aria-label="下移记录"
+                  >
+                    <MoveDown className="w-4 h-4" />
+                  </button>
+                </div>
                 <button type="button" onClick={onEdit} className="p-2 rounded-xl text-white/45 hover:text-white hover:bg-white/10">
                   <Edit2 className="w-4 h-4" />
                 </button>

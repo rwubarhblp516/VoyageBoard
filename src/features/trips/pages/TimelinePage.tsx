@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -1785,35 +1785,32 @@ function TimelineCard({
       initial={{ opacity: 0, y: 14, scale: 0.98 }}
       animate={{ opacity: isDragging ? 0.55 : 1, y: 0, scale: isDragging ? 0.985 : 1 }}
       exit={{ opacity: 0, x: -20, scale: 0.98 }}
-      className="relative touch-manipulation rounded-[30px] pl-10 sm:pl-16"
+      className="relative touch-manipulation rounded-[30px] pl-7 sm:pl-10"
     >
-      <div className="absolute left-4 top-7 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-white text-black text-[11px] font-black shadow-lg shadow-black/20 sm:left-[15px] sm:h-8 sm:w-8 sm:text-xs">
+      <div className="absolute left-0 top-5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-black text-[10px] font-black shadow-lg shadow-black/20 sm:left-1 sm:h-7 sm:w-7 sm:text-[11px]">
         {index + 1}
       </div>
 
       <div className="glass-card rounded-[24px] border border-white/10 p-4 sm:rounded-[28px] sm:p-5 shadow-lg transition-all hover:border-white/20">
-        <div className="flex items-start gap-4">
-          <div className={`shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl border flex items-center justify-center ${meta.tone}`}>
-            {entry.type === 'transport' ? <TransportIcon className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="min-w-0">
-              <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
-                <span className="text-[11px] font-black text-white/35">{meta.label}</span>
-              </div>
-              {entry.type === 'transport' && segment ? (
-                <div className="mt-1 grid gap-1.5">
+          <div className="min-w-0">
+            {entry.type === 'transport' && segment ? (
+              <>
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
+                  <span className="text-[11px] font-black text-white/35">{meta.label}</span>
+                </div>
+                <div className="grid gap-1.5">
                   <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
                     <p className="text-[10px] font-black text-white/35">出发地</p>
                     <h3 className="mt-0.5 text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">
                       {segment.origin_name}
                     </h3>
                   </div>
-                  <div className="flex items-center gap-2 px-3 text-sky-100/75">
+                  <div className="flex items-center gap-2 px-2 text-sky-100/75">
                     <span className="h-px flex-1 bg-white/10" />
-                    <span className="text-sm font-black">→</span>
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg border ${meta.tone}`}>
+                      <TransportIcon className="w-4 h-4" />
+                    </div>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -1823,89 +1820,97 @@ function TimelineCard({
                     </h3>
                   </div>
                 </div>
-              ) : (
-                <h3 className="text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">{entry.title}</h3>
-              )}
-            </div>
-
-            {summary && <p className="mt-2 text-sm font-bold text-white/65">{summary}</p>}
-            {(entry.content || segment?.note) && (
-              <p className="mt-3 text-sm leading-6 text-white/75 break-words">{entry.content || segment?.note}</p>
-            )}
-            {entry.images && entry.images.length > 0 && (
-              <TimelinePhotoStack images={entry.images} title={entry.title} />
-            )}
-            {entry.tags && entry.tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {entry.tags.map((tag) => (
-                  <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/65 border border-white/10">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/55 border border-white/10">
-                {entry.created_by_member?.display_name ? `记录者：${entry.created_by_member.display_name}` : '记录者未知'}
-              </span>
-              <span className={`rounded-full px-3 py-1 text-[11px] font-black border ${
-                entry.include_in_guide
-                  ? 'bg-emerald-400/15 text-emerald-100 border-emerald-300/20'
-                  : 'bg-white/5 text-white/45 border-white/10'
-              }`}>
-                {entry.include_in_guide ? '进入攻略素材' : '不进入攻略'}
-              </span>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-              <button
-                type="button"
-                disabled={moving}
-                {...attributes}
-                {...listeners}
-                className="inline-flex h-10 min-w-0 cursor-grab touch-none items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-black text-white/45 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
-                aria-label="拖拽排序"
-                title="拖拽排序"
-              >
-                <GripVertical className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">拖拽排序</span>
-              </button>
-
-              <div className="flex shrink-0 items-center gap-1.5">
-                <div className="flex rounded-2xl border border-white/10 bg-white/5">
-                  <button
-                    type="button"
-                    onClick={onMoveUp}
-                    disabled={!canMoveUp || moving}
-                    className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
-                    aria-label="上移记录"
-                  >
-                    <MoveUp className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onMoveDown}
-                    disabled={!canMoveDown || moving}
-                    className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
-                    aria-label="下移记录"
-                  >
-                    <MoveDown className="w-4 h-4" />
-                  </button>
+              </>
+            ) : (
+              <>
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <div className={`inline-flex h-6 w-6 items-center justify-center rounded-lg border ${meta.tone}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[11px] font-black text-white/45 uppercase tracking-[0.18em]">{formatTime(time)}</span>
+                  <span className="text-[11px] font-black text-white/35">{meta.label}</span>
                 </div>
-                <button type="button" onClick={onEdit} className="p-2.5 rounded-2xl text-white/45 hover:text-white hover:bg-white/10">
-                  <Edit2 className="w-4 h-4" />
+                <h3 className="text-base sm:text-xl font-black leading-snug text-white tracking-tight break-words">{entry.title}</h3>
+              </>
+            )}
+          </div>
+
+          {summary && <p className="mt-2 text-sm font-bold text-white/65">{summary}</p>}
+          {(entry.content || segment?.note) && (
+            <p className="mt-3 text-sm leading-6 text-white/75 break-words">{entry.content || segment?.note}</p>
+          )}
+          {entry.images && entry.images.length > 0 && (
+            <TimelinePhotoStack images={entry.images} title={entry.title} />
+          )}
+          {entry.tags && entry.tags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {entry.tags.map((tag) => (
+                <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/65 border border-white/10">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/55 border border-white/10">
+              {entry.created_by_member?.display_name ? `记录者：${entry.created_by_member.display_name}` : '记录者未知'}
+            </span>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-black border ${
+              entry.include_in_guide
+                ? 'bg-emerald-400/15 text-emerald-100 border-emerald-300/20'
+                : 'bg-white/5 text-white/45 border-white/10'
+            }`}>
+              {entry.include_in_guide ? '进入攻略素材' : '不进入攻略'}
+            </span>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
+            <button
+              type="button"
+              disabled={moving}
+              {...attributes}
+              {...listeners}
+              className="inline-flex h-10 min-w-0 cursor-grab touch-none items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-black text-white/45 hover:bg-white/10 hover:text-white active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25"
+              aria-label="拖拽排序"
+              title="拖拽排序"
+            >
+              <GripVertical className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">拖拽排序</span>
+            </button>
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex rounded-2xl border border-white/10 bg-white/5">
+                <button
+                  type="button"
+                  onClick={onMoveUp}
+                  disabled={!canMoveUp || moving}
+                  className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
+                  aria-label="上移记录"
+                >
+                  <MoveUp className="w-4 h-4" />
                 </button>
-                {canDelete && (
-                  <button type="button" onClick={onDelete} className="p-2.5 rounded-2xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={onMoveDown}
+                  disabled={!canMoveDown || moving}
+                  className="p-2.5 text-white/45 hover:text-white disabled:opacity-25"
+                  aria-label="下移记录"
+                >
+                  <MoveDown className="w-4 h-4" />
+                </button>
               </div>
+              <button type="button" onClick={onEdit} className="p-2.5 rounded-2xl text-white/45 hover:text-white hover:bg-white/10">
+                <Edit2 className="w-4 h-4" />
+              </button>
+              {canDelete && (
+                <button type="button" onClick={onDelete} className="p-2.5 rounded-2xl text-red-300/60 hover:text-red-200 hover:bg-red-400/10">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
-      </div>
     </motion.article>
   )
 }
@@ -2550,8 +2555,11 @@ function LocationSearchInput({
   const [suggestions, setSuggestions] = useState<LocationPoint[]>([])
   const [searching, setSearching] = useState(false)
   const [open, setOpen] = useState(false)
+  const userTouched = useRef(false)
 
   useEffect(() => {
+    if (!userTouched.current) return
+
     const keyword = value.trim()
     if (keyword.length < 2) {
       setSuggestions([])
@@ -2589,8 +2597,13 @@ function LocationSearchInput({
       <div className="relative">
         <input
           value={value}
-          onChange={(event) => onInputChange(event.target.value)}
-          onFocus={() => setOpen(suggestions.length > 0)}
+          onChange={(event) => {
+            userTouched.current = true
+            onInputChange(event.target.value)
+          }}
+          onFocus={() => {
+            if (userTouched.current) setOpen(suggestions.length > 0)
+          }}
           placeholder={placeholder}
           className="glass-input pr-11"
         />

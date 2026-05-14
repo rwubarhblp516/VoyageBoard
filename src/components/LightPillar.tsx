@@ -68,7 +68,7 @@ const LightPillar: React.FC<LightPillarProps> = ({
     if (isMobile && quality !== 'low') effectiveQuality = 'low';
 
     const qualitySettings = {
-      low: { iterations: 24, waveIterations: 1, pixelRatio: 0.5, precision: 'mediump', stepMultiplier: 1.5 },
+      low: { iterations: 16, waveIterations: 1, pixelRatio: 0.5, precision: 'mediump', stepMultiplier: 1.8 },
       medium: { iterations: 40, waveIterations: 2, pixelRatio: 0.65, precision: 'mediump', stepMultiplier: 1.2 },
       high: {
         iterations: 80,
@@ -317,11 +317,26 @@ const LightPillar: React.FC<LightPillarProps> = ({
 
     // Animation loop with fixed timestep
     let lastTime = performance.now();
-    const targetFPS = effectiveQuality === 'low' ? 30 : 60;
+    const targetFPS = isMobile ? 15 : (effectiveQuality === 'low' ? 30 : 60);
     const frameTime = 1000 / targetFPS;
+    let visible = true;
+
+    const handleVisibility = () => {
+      visible = document.visibilityState === 'visible';
+      if (visible && !rafRef.current) {
+        lastTime = performance.now();
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
 
     const animate = (currentTime: number) => {
       if (!materialRef.current || !rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+
+      if (!visible) {
+        rafRef.current = null;
+        return;
+      }
 
       const deltaTime = currentTime - lastTime;
 
@@ -362,6 +377,7 @@ const LightPillar: React.FC<LightPillarProps> = ({
 
     // Cleanup
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('resize', handleResize);
       if (interactive) {
         container.removeEventListener('mousemove', handleMouseMove);

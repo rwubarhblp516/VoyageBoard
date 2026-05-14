@@ -43,12 +43,31 @@ export default function MainLayout() {
             <Home className="w-5 h-5 group-hover:scale-110 transition-transform" />
           </button>
 
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-2.5 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all active:scale-90 shadow-lg group"
-          >
-            <SettingsIcon className="w-5 h-5 group-hover:rotate-45 transition-transform" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/members')}
+              className={`group flex h-11 items-center gap-2 rounded-2xl border px-3 text-white/70 shadow-lg backdrop-blur-xl transition-all active:scale-90 ${
+                location.pathname.startsWith('/members')
+                  ? 'border-white/20 bg-white text-black'
+                  : 'border-white/10 bg-white/5 hover:bg-white/10 hover:text-white'
+              }`}
+              aria-label="成员管理"
+            >
+              <Users className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="hidden text-xs font-black tracking-widest sm:inline">成员</span>
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className={`p-2.5 backdrop-blur-xl border rounded-2xl transition-all active:scale-90 shadow-lg group ${
+                location.pathname.startsWith('/settings')
+                  ? 'border-white/20 bg-white text-black'
+                  : 'border-white/10 bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
+              }`}
+              aria-label="设置"
+            >
+              <SettingsIcon className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -70,20 +89,6 @@ export default function MainLayout() {
       <main className="relative z-10 max-w-5xl mx-auto px-6 pt-24 pb-44">
         <Outlet />
       </main>
-
-      {/* 成员管理悬浮按钮 (FAB) */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => navigate('/members')}
-        className="fixed right-6 bottom-32 sm:right-12 sm:bottom-36 z-50 w-14 h-14 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl flex items-center justify-center text-white shadow-2xl group transition-all"
-      >
-        <div className="absolute inset-0 bg-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-        <Users className="h-6 w-6 relative z-10" />
-        <span className="absolute right-full mr-4 px-3 py-1.5 bg-black/40 backdrop-blur-md rounded-xl text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap pointer-events-none">
-          成员管理
-        </span>
-      </motion.button>
 
       {/* 极简高级底部导航 (Dock Style) */}
       <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-[420px] px-6">

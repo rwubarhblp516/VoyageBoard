@@ -111,6 +111,11 @@ export default function ExpenseListPage() {
                     <span className="text-[9px] font-bold bg-white/15 text-white px-1.5 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap">
                       {isIndividual ? '个人' : 'AA'}
                     </span>
+                    {expense.timeline_entry_id && (
+                      <span className="text-[9px] font-bold bg-emerald-400/15 text-emerald-100 px-1.5 py-0.5 rounded-md uppercase tracking-wider whitespace-nowrap border border-emerald-300/15">
+                        已关联行程
+                      </span>
+                    )}
                   </div>
                 </div>
                 

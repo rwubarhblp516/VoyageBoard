@@ -176,6 +176,7 @@ export default function MainLayout() {
               queryClient.invalidateQueries({ queryKey: ['expenses'] })
               queryClient.invalidateQueries({ queryKey: ['dashboard'] })
               queryClient.invalidateQueries({ queryKey: ['settlement'] })
+              queryClient.invalidateQueries({ queryKey: ['timelineEntries'] })
             }}
           />
         )}

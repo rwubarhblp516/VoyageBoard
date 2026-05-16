@@ -62,6 +62,7 @@ export type Database = {
           expense_date: string
           id: string
           payer_member_id: string
+          timeline_entry_id: string | null
           title: string
           trip_id: string
         }
@@ -73,6 +74,7 @@ export type Database = {
           expense_date?: string
           id?: string
           payer_member_id: string
+          timeline_entry_id?: string | null
           title: string
           trip_id: string
         }
@@ -84,6 +86,7 @@ export type Database = {
           expense_date?: string
           id?: string
           payer_member_id?: string
+          timeline_entry_id?: string | null
           title?: string
           trip_id?: string
         }
@@ -93,6 +96,13 @@ export type Database = {
             columns: ["payer_member_id"]
             isOneToOne: false
             referencedRelation: "trip_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_timeline_entry_id_fkey"
+            columns: ["timeline_entry_id"]
+            isOneToOne: false
+            referencedRelation: "timeline_entries"
             referencedColumns: ["id"]
           },
           {

@@ -703,6 +703,24 @@ const buildExpectedDays = (startDate: string, endDate: string) => {
   return days.length > 0 ? days : [{ day_index: 1, date: startDate }]
 }
 
+const getTimelineDayStorageKey = (tripId: string) => `voyageboard-timeline-day-${tripId}`
+
+const getInitialTimelineDayIndex = (trip: Trip) => {
+  const expectedDays = buildExpectedDays(trip.start_date, trip.end_date)
+  const todayText = toDateText(new Date())
+  const today = expectedDays.find((day) => day.date === todayText)
+  if (today) return today.day_index
+
+  try {
+    const savedIndex = Number(window.localStorage.getItem(getTimelineDayStorageKey(trip.id)))
+    if (expectedDays.some((day) => day.day_index === savedIndex)) return savedIndex
+  } catch {
+    // localStorage may be unavailable in private browsing modes.
+  }
+
+  return expectedDays[0]?.day_index || 1
+}
+
 export default function TimelinePage() {
   const { currentTrip } = useTripStore()
 
@@ -715,7 +733,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const { user } = useAuthStore()
   const queryClient = useQueryClient()
 
-  const [activeDayIndex, setActiveDayIndex] = useState(1)
+  const [activeDayIndex, setActiveDayIndex] = useState(() => getInitialTimelineDayIndex(currentTrip))
   const [pickerOpen, setPickerOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [quickNoteOpen, setQuickNoteOpen] = useState(false)
@@ -741,6 +759,18 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     () => buildExpectedDays(currentTrip.start_date, currentTrip.end_date),
     [currentTrip.start_date, currentTrip.end_date],
   )
+
+  useEffect(() => {
+    setActiveDayIndex(getInitialTimelineDayIndex(currentTrip))
+  }, [currentTrip.id, currentTrip.start_date, currentTrip.end_date])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(getTimelineDayStorageKey(currentTrip.id), String(activeDayIndex))
+    } catch {
+      // Ignore storage failures; the current in-memory selection still works.
+    }
+  }, [activeDayIndex, currentTrip.id])
 
   const { data: currentMember } = useQuery({
     queryKey: ['currentMember', currentTrip.id, user?.id],

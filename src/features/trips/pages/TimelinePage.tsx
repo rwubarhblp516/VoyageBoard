@@ -206,6 +206,17 @@ type MapStyleOption = {
   label: string
 }
 
+type PendingImageUploadJob = {
+  id: string
+  tripId: string
+  dayId: string
+  entryId: string
+  memberId: string
+  files: File[]
+  existingCount: number
+  createdAt: string
+}
+
 declare global {
   interface Window {
     AMap?: any
@@ -613,6 +624,50 @@ const getTimelineImageUrl = (storagePath: string) => (
   supabase.storage.from('trip-images').getPublicUrl(storagePath).data.publicUrl
 )
 
+const imageUploadDbName = 'voyageboard-image-upload-cache'
+const imageUploadStoreName = 'pending-images'
+
+const openImageUploadDb = () => new Promise<IDBDatabase>((resolve, reject) => {
+  if (!('indexedDB' in window)) {
+    reject(new Error('当前浏览器不支持本地图片缓存'))
+    return
+  }
+
+  const request = window.indexedDB.open(imageUploadDbName, 1)
+  request.onupgradeneeded = () => {
+    const db = request.result
+    if (!db.objectStoreNames.contains(imageUploadStoreName)) {
+      db.createObjectStore(imageUploadStoreName, { keyPath: 'id' })
+    }
+  }
+  request.onsuccess = () => resolve(request.result)
+  request.onerror = () => reject(request.error || new Error('打开本地图片缓存失败'))
+})
+
+const withImageUploadStore = async <T,>(
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+) => {
+  const db = await openImageUploadDb()
+  return new Promise<T>((resolve, reject) => {
+    const transaction = db.transaction(imageUploadStoreName, mode)
+    const request = run(transaction.objectStore(imageUploadStoreName))
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error || new Error('访问本地图片缓存失败'))
+    transaction.oncomplete = () => db.close()
+    transaction.onerror = () => {
+      db.close()
+      reject(transaction.error || new Error('本地图片缓存事务失败'))
+    }
+  })
+}
+
+const cacheImageUploadJob = (job: PendingImageUploadJob) => withImageUploadStore('readwrite', (store) => store.put(job))
+
+const deleteImageUploadJob = (jobId: string) => withImageUploadStore('readwrite', (store) => store.delete(jobId))
+
+const getCachedImageUploadJobs = () => withImageUploadStore<PendingImageUploadJob[]>('readonly', (store) => store.getAll())
+
 const compressImageToWebp = async (file: File) => {
   const bitmap = await createImageBitmap(file)
   const maxSide = 1920
@@ -780,6 +835,92 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setPendingImageFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
   }
 
+  const uploadImagesForEntry = async (job: PendingImageUploadJob) => {
+    if (job.files.length === 0) return
+
+    for (const [index, file] of job.files.entries()) {
+      const { blob, width, height } = await compressImageToWebp(file)
+      const storagePath = `${job.tripId}/${job.entryId}/${crypto.randomUUID()}.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('trip-images')
+        .upload(storagePath, blob, {
+          contentType: 'image/webp',
+          cacheControl: '31536000',
+          upsert: false,
+        })
+
+      if (uploadError) throw uploadError
+
+      const { error: imageError } = await supabase
+        .from('timeline_entry_images')
+        .insert({
+          trip_id: job.tripId,
+          day_id: job.dayId,
+          timeline_entry_id: job.entryId,
+          storage_path: storagePath,
+          original_name: file.name,
+          mime_type: 'image/webp',
+          width,
+          height,
+          size_bytes: blob.size,
+          sort_order: job.existingCount + index + 1,
+          created_by_member_id: job.memberId,
+        })
+
+      if (imageError) throw imageError
+    }
+  }
+
+  const processCachedImageUploadJob = async (job: PendingImageUploadJob, silent = false) => {
+    try {
+      await uploadImagesForEntry(job)
+      await deleteImageUploadJob(job.id)
+      queryClient.invalidateQueries({ queryKey: ['timelineEntries', job.tripId, job.dayId] })
+    } catch (error: any) {
+      if (!silent) alert(error.message || '图片后台上传失败，稍后会自动重试。')
+    }
+  }
+
+  const queueImagesForBackgroundUpload = async (entryId: string, files: File[], existingCount: number) => {
+    if (!activeDay || !currentMember || files.length === 0) return
+
+    const job: PendingImageUploadJob = {
+      id: crypto.randomUUID(),
+      tripId: currentTrip.id,
+      dayId: activeDay.id,
+      entryId,
+      memberId: currentMember.id,
+      files,
+      existingCount,
+      createdAt: new Date().toISOString(),
+    }
+
+    try {
+      await cacheImageUploadJob(job)
+      processCachedImageUploadJob(job, false)
+    } catch {
+      processCachedImageUploadJob(job, false)
+    }
+  }
+
+  useEffect(() => {
+    if (!currentMember) return
+    let cancelled = false
+
+    getCachedImageUploadJobs()
+      .then((jobs) => {
+        if (cancelled) return
+        jobs
+          .filter((job) => job.tripId === currentTrip.id)
+          .forEach((job) => processCachedImageUploadJob(job, true))
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentMember, currentTrip.id])
+
   const openNewForm = (type: TimelineEntryType) => {
     const nextForm = emptyForm(type)
     const currentTime = getCurrentTimeValue()
@@ -929,43 +1070,6 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     }
   }
 
-  const uploadPendingImages = async (entryId: string) => {
-    if (!activeDay || !currentMember || pendingImageFiles.length === 0) return
-
-    const existingCount = editingEntry?.images?.length || 0
-    for (const [index, file] of pendingImageFiles.entries()) {
-      const { blob, width, height } = await compressImageToWebp(file)
-      const storagePath = `${currentTrip.id}/${entryId}/${crypto.randomUUID()}.webp`
-      const { error: uploadError } = await supabase.storage
-        .from('trip-images')
-        .upload(storagePath, blob, {
-          contentType: 'image/webp',
-          cacheControl: '31536000',
-          upsert: false,
-        })
-
-      if (uploadError) throw uploadError
-
-      const { error: imageError } = await supabase
-        .from('timeline_entry_images')
-        .insert({
-          trip_id: currentTrip.id,
-          day_id: activeDay.id,
-          timeline_entry_id: entryId,
-          storage_path: storagePath,
-          original_name: file.name,
-          mime_type: 'image/webp',
-          width,
-          height,
-          size_bytes: blob.size,
-          sort_order: existingCount + index + 1,
-          created_by_member_id: currentMember.id,
-        })
-
-      if (imageError) throw imageError
-    }
-  }
-
   const handleDeleteImage = async (image: TimelineImage) => {
     if (!window.confirm('确认删除这张图片吗？')) return
 
@@ -1010,6 +1114,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     }
 
     setSaving(true)
+    const imagesToUpload = pendingImageFiles
+    const existingImageCount = editingEntry?.images?.length || 0
 
     try {
       const entryPayload = buildEntryPayload()
@@ -1045,12 +1151,15 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
           const { error } = await supabase.from('travel_segments').insert(segmentPayload)
           if (error) throw error
         }
+      } else if (editingEntry?.travel_segments?.[0]) {
+        const { error } = await supabase
+          .from('travel_segments')
+          .delete()
+          .eq('timeline_entry_id', editingEntry.id)
+        if (error) throw error
       }
 
-      if (entryId) {
-        await uploadPendingImages(entryId)
-      }
-
+      if (entryId) await queueImagesForBackgroundUpload(entryId, imagesToUpload, existingImageCount)
       await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
       closeForm()
     } catch (error: any) {
@@ -1073,6 +1182,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     }
 
     setQuickSaving(true)
+    const imagesToUpload = pendingImageFiles
 
     try {
       const title = content.length > 22 ? `${content.slice(0, 22)}...` : content
@@ -1102,7 +1212,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         .single()
 
       if (error) throw error
-      await uploadPendingImages(data.id)
+      await queueImagesForBackgroundUpload(data.id, imagesToUpload, 0)
       await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
       closeForm()
     } catch (error: any) {
@@ -1280,6 +1390,34 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     } finally {
       setMapCalculating(false)
     }
+  }
+
+  const handleFormTypeChange = (type: TimelineEntryType) => {
+    setForm((current) => {
+      if (current.type === type) return current
+
+      const next = { ...current, type }
+      if (type === 'transport') {
+        next.departure_time = current.departure_time || current.start_time || getCurrentTimeValue()
+        next.arrival_time = current.arrival_time || current.end_time
+        next.origin_name = current.origin_name || current.place_name
+        next.origin_address = current.origin_address || current.address
+        next.origin_latitude = current.origin_latitude || current.latitude
+        next.origin_longitude = current.origin_longitude || current.longitude
+        next.destination_name = current.destination_name || current.title
+        return next
+      }
+
+      next.start_time = current.start_time || current.departure_time || getCurrentTimeValue()
+      next.end_time = current.end_time || current.arrival_time
+      next.title = current.title || [current.origin_name, current.destination_name].filter(Boolean).join(' → ')
+      next.content = current.content || current.note
+      next.place_name = current.place_name || current.destination_name || current.origin_name
+      next.address = current.address || current.destination_address || current.origin_address
+      next.latitude = current.latitude || current.destination_latitude || current.origin_latitude
+      next.longitude = current.longitude || current.destination_longitude || current.origin_longitude
+      return next
+    })
   }
 
   const activeExpectedDay = expectedDays.find((day) => day.day_index === activeDayIndex) || expectedDays[0]
@@ -1489,6 +1627,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               onClose={closeForm}
               onSave={handleSave}
               onChange={updateForm}
+              onTypeChange={handleFormTypeChange}
               onMapCalculate={handleMapCalculate}
               existingImages={editingEntry?.images || []}
               pendingImageFiles={pendingImageFiles}
@@ -1527,6 +1666,7 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   const [mapError, setMapError] = useState('')
   const [mapStyle, setMapStyle] = useState(mapStyleOptions[0].value)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [activePointIndex, setActivePointIndex] = useState<number | null>(null)
 
   const mapPoints = useMemo(() => {
     const points: Array<{ name: string; address?: string | null; longitude: number; latitude: number; type: TimelineEntryType }> = []
@@ -1576,6 +1716,12 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   }, [entries])
 
   useEffect(() => {
+    if (activePointIndex !== null && activePointIndex >= mapPoints.length) {
+      setActivePointIndex(null)
+    }
+  }, [activePointIndex, mapPoints.length])
+
+  useEffect(() => {
     if (mapPoints.length === 0) return
     let map: any
     let disposed = false
@@ -1592,20 +1738,25 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
           resizeEnable: true,
         })
 
-        const markers = mapPoints.map((point, index) => new AMap.Marker({
-          position: [point.longitude, point.latitude],
-          anchor: 'bottom-center',
-          title: point.name,
-          offset: new AMap.Pixel(0, -2),
-          content: `
-            <svg width="34" height="43" viewBox="0 0 34 43" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 10px 14px rgba(15,23,42,.28));">
-              <path d="M17 41C17 41 30 25.6 30 14.8C30 6.6 24.2 1 17 1C9.8 1 4 6.6 4 14.8C4 25.6 17 41 17 41Z" fill="#0EA5E9" stroke="white" stroke-width="2"/>
-              <path d="M17 37C17 37 27 24.4 27 15C27 8.6 22.5 4 17 4C11.5 4 7 8.6 7 15C7 24.4 17 37 17 37Z" fill="#0284C7"/>
-              <text x="17" y="20.2" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="900">${index + 1}</text>
-            </svg>
-          `,
-        }))
+        const markers = mapPoints.map((point, index) => {
+          const marker = new AMap.Marker({
+            position: [point.longitude, point.latitude],
+            anchor: 'bottom-center',
+            title: point.name,
+            offset: new AMap.Pixel(0, -2),
+            content: `
+              <svg width="34" height="43" viewBox="0 0 34 43" xmlns="http://www.w3.org/2000/svg" style="display:block;filter:drop-shadow(0 10px 14px rgba(15,23,42,.28));">
+                <path d="M17 41C17 41 30 25.6 30 14.8C30 6.6 24.2 1 17 1C9.8 1 4 6.6 4 14.8C4 25.6 17 41 17 41Z" fill="#0EA5E9" stroke="white" stroke-width="2"/>
+                <path d="M17 37C17 37 27 24.4 27 15C27 8.6 22.5 4 17 4C11.5 4 7 8.6 7 15C7 24.4 17 37 17 37Z" fill="#0284C7"/>
+                <text x="17" y="20.2" text-anchor="middle" dominant-baseline="middle" fill="white" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="900">${index + 1}</text>
+              </svg>
+            `,
+          })
+          marker.on('click', () => setActivePointIndex(index))
+          return marker
+        })
         map.add(markers)
+        map.on('click', () => setActivePointIndex(null))
 
         const polylines = entries
           .map((entry) => entry.travel_segments?.[0])
@@ -1703,16 +1854,36 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
       </div>
       <div className="relative mx-3 mb-3 overflow-hidden rounded-[24px] border border-white/10 bg-white">
         <div id={containerId} className={`${isFullscreen ? 'h-[calc(100vh-156px)] sm:h-[calc(100vh-150px)]' : 'h-[280px] sm:h-[360px]'} w-full`} />
-        <div className="pointer-events-none absolute left-3 right-3 bottom-3 flex gap-2 overflow-hidden">
-          {mapPoints.slice(0, 5).map((point, index) => (
-            <div key={`${point.name}-${point.longitude}-${point.latitude}-chip`} className="min-w-0 max-w-[160px] rounded-full border border-black/5 bg-white/90 px-3 py-2 text-xs font-black text-slate-900 shadow-lg backdrop-blur-md">
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-500 text-[10px] text-white">
-                {index + 1}
-              </span>
-              <span className="align-middle">{point.name}</span>
+        {activePointIndex !== null && mapPoints[activePointIndex] && (
+          <div className="absolute left-3 right-3 bottom-3 rounded-3xl border border-black/5 bg-white/95 p-4 text-slate-950 shadow-2xl backdrop-blur-md sm:left-auto sm:w-[320px]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500 text-xs font-black text-white">
+                    {activePointIndex + 1}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-500">
+                    {getEntryMeta(mapPoints[activePointIndex].type).label}
+                  </span>
+                </div>
+                <h4 className="truncate text-base font-black">{mapPoints[activePointIndex].name}</h4>
+                {mapPoints[activePointIndex].address && (
+                  <p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-slate-500">
+                    {mapPoints[activePointIndex].address}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setActivePointIndex(null)}
+                className="shrink-0 rounded-full bg-slate-100 p-2 text-slate-500 hover:bg-slate-200 hover:text-slate-900"
+                aria-label="关闭点位详情"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
       {mapError && (
         <div className="border-t border-white/10 px-5 py-3 text-xs font-bold text-rose-100/80">
@@ -2110,6 +2281,7 @@ function EntryFormModal({
   onClose,
   onSave,
   onChange,
+  onTypeChange,
   onMapCalculate,
   existingImages,
   pendingImageFiles,
@@ -2124,6 +2296,7 @@ function EntryFormModal({
   onClose: () => void
   onSave: (event: React.FormEvent) => void
   onChange: <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => void
+  onTypeChange: (type: TimelineEntryType) => void
   onMapCalculate: () => void
   existingImages: TimelineImage[]
   pendingImageFiles: File[]
@@ -2164,6 +2337,33 @@ function EntryFormModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {editing && (
+          <section className="mb-5 rounded-[24px] border border-white/10 bg-white/5 p-3">
+            <div className="mb-3 pl-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/45">记录类型</div>
+            <div className="grid grid-cols-4 gap-2">
+              {entryTypes.map((entryType) => {
+                const TypeIcon = entryType.icon
+                const isActive = entryType.value === form.type
+                return (
+                  <button
+                    key={entryType.value}
+                    type="button"
+                    onClick={() => onTypeChange(entryType.value)}
+                    className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-[11px] font-black transition-all ${
+                      isActive
+                        ? 'border-white bg-white text-black'
+                        : 'border-white/10 bg-black/10 text-white/60 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <TypeIcon className="h-4 w-4" />
+                    <span>{entryType.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {isTransport ? (
           <div className="space-y-4">

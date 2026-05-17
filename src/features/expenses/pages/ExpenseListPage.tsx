@@ -1,10 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
-import { Loader2, Utensils, Car, Ticket, ShoppingBag, Hotel, MoreHorizontal, ReceiptText, Plane, Train, ShoppingBasket, Tag, Bus, Trash2 } from 'lucide-react'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { Loader2, Utensils, Car, Ticket, ShoppingBag, Hotel, MoreHorizontal, ReceiptText, Plane, Train, ShoppingBasket, Tag, Bus, Trash2, CalendarDays, Target, WalletCards } from 'lucide-react'
 import { format } from 'date-fns'
 import { motion } from 'framer-motion'
 import { useUIStore } from '@/stores/useUIStore'
+import { useEffect, useMemo, useState } from 'react'
 
 const categoryIcons: Record<string, React.ReactNode> = {
   food: <Utensils className="w-5 h-5" />,
@@ -24,11 +26,61 @@ const getCategoryIcon = (category: string) => {
   return categoryIcons[category] || <Tag className="w-5 h-5" />
 }
 
+const getTodayText = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const formatCurrency = (amountInCents: number, currency?: string | null) => (
+  `${(amountInCents / 100).toFixed(2)}${currency ? ` ${currency}` : ''}`
+)
+
+const formatExpenseDate = (dateText: string) => {
+  const date = new Date(`${dateText}T00:00:00`)
+  return `${date.getMonth() + 1}月${date.getDate()}日`
+}
+
 export default function ExpenseListPage() {
   const { currentTrip } = useTripStore()
+  const { user } = useAuthStore()
   const searchQuery = ''
   const queryClient = useQueryClient()
   const { openAddExpense } = useUIStore()
+  const budgetStorageKey = currentTrip ? `voyageboard-daily-budget-${currentTrip.id}-${user?.id || 'guest'}` : ''
+  const [dailyBudgetText, setDailyBudgetText] = useState('')
+
+  useEffect(() => {
+    if (!budgetStorageKey) return
+    setDailyBudgetText(window.localStorage.getItem(budgetStorageKey) || '')
+  }, [budgetStorageKey])
+
+  useEffect(() => {
+    if (!budgetStorageKey) return
+    if (dailyBudgetText.trim()) {
+      window.localStorage.setItem(budgetStorageKey, dailyBudgetText)
+    } else {
+      window.localStorage.removeItem(budgetStorageKey)
+    }
+  }, [budgetStorageKey, dailyBudgetText])
+
+  const { data: currentMember } = useQuery({
+    queryKey: ['currentMember', currentTrip?.id, user?.id],
+    queryFn: async () => {
+      if (!currentTrip || !user) return null
+      const { data, error } = await supabase
+        .from('trip_members')
+        .select('id')
+        .eq('trip_id', currentTrip.id)
+        .eq('user_id', user.id)
+        .single()
+      if (error) throw error
+      return data
+    },
+    enabled: !!currentTrip && !!user,
+  })
 
   const { data: expenses, isLoading } = useQuery({
     queryKey: ['expenses', currentTrip?.id],
@@ -36,7 +88,7 @@ export default function ExpenseListPage() {
       if (!currentTrip) return []
       const { data, error } = await supabase
         .from('expenses')
-        .select('*, payer:trip_members!payer_member_id(display_name), participants:expense_participants(member_id)')
+        .select('*, payer:trip_members!payer_member_id(display_name), participants:expense_participants(member_id, calculated_amount)')
         .eq('trip_id', currentTrip.id)
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false })
@@ -46,6 +98,40 @@ export default function ExpenseListPage() {
     },
     enabled: !!currentTrip,
   })
+
+  const myExpenseStats = useMemo(() => {
+    const memberId = currentMember?.id
+    const dailyTotals = new Map<string, number>()
+    if (!memberId || !expenses) {
+      return { total: 0, today: 0, daily: [] as Array<{ date: string; amount: number }> }
+    }
+
+    expenses.forEach((expense) => {
+      const participant = expense.participants?.find((item: any) => item.member_id === memberId)
+      const relatedAmount = participant
+        ? Number(participant.calculated_amount || 0)
+        : expense.payer_member_id === memberId
+          ? Number(expense.amount || 0)
+          : 0
+
+      if (relatedAmount <= 0) return
+      dailyTotals.set(expense.expense_date, (dailyTotals.get(expense.expense_date) || 0) + relatedAmount)
+    })
+
+    const daily = Array.from(dailyTotals.entries())
+      .map(([date, amount]) => ({ date, amount }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+
+    return {
+      total: daily.reduce((sum, item) => sum + item.amount, 0),
+      today: dailyTotals.get(getTodayText()) || 0,
+      daily,
+    }
+  }, [currentMember?.id, expenses])
+
+  const dailyBudget = dailyBudgetText.trim() ? Math.round(Number(dailyBudgetText) * 100) : 0
+  const budgetRatio = dailyBudget > 0 ? Math.min(100, Math.round((myExpenseStats.today / dailyBudget) * 100)) : 0
+  const budgetDiff = dailyBudget - myExpenseStats.today
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -77,6 +163,103 @@ export default function ExpenseListPage() {
         <p className="text-white/80 font-medium drop-shadow-sm mb-8">清楚记录，享受每一次探索。</p>
         
       </header>
+
+      <section className="mb-6 glass-card rounded-[32px] border border-white/10 p-5 sm:p-6 shadow-xl">
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-[10px] font-black text-white/45 uppercase tracking-[0.25em]">
+                <WalletCards className="h-4 w-4" />
+                MY SPENDING
+              </div>
+              <h2 className="mt-2 text-2xl font-black text-white">我的支出概览</h2>
+              <p className="mt-1 text-xs font-bold text-white/45">按我实际承担的分摊金额统计。</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
+              <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/45">
+                <Target className="h-4 w-4" />
+                每日上限
+              </label>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={dailyBudgetText}
+                  onChange={(event) => setDailyBudgetText(event.target.value)}
+                  placeholder="例如 300"
+                  className="w-28 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-right text-sm font-black text-white outline-none focus:border-white/30"
+                />
+                <span className="text-xs font-black text-white/45">{currentTrip?.currency || ''}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-2 text-xs font-black text-white/45">
+                <CalendarDays className="h-4 w-4" />
+                今日
+              </div>
+              <p className="mt-3 text-3xl font-black tracking-tight text-white">
+                {formatCurrency(myExpenseStats.today, currentTrip?.currency)}
+              </p>
+              {dailyBudget > 0 && (
+                <p className={`mt-2 text-xs font-bold ${budgetDiff >= 0 ? 'text-emerald-100/75' : 'text-rose-100/85'}`}>
+                  {budgetDiff >= 0 ? `剩余 ${formatCurrency(budgetDiff, currentTrip?.currency)}` : `超出 ${formatCurrency(Math.abs(budgetDiff), currentTrip?.currency)}`}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="text-xs font-black text-white/45">我的总花费</div>
+              <p className="mt-3 text-3xl font-black tracking-tight text-white">
+                {formatCurrency(myExpenseStats.total, currentTrip?.currency)}
+              </p>
+              <p className="mt-2 text-xs font-bold text-white/40">{myExpenseStats.daily.length} 天有相关支出</p>
+            </div>
+
+            <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
+              <div className="text-xs font-black text-white/45">预算状态</div>
+              <p className={`mt-3 text-2xl font-black ${dailyBudget > 0 && budgetDiff < 0 ? 'text-rose-100' : 'text-white'}`}>
+                {dailyBudget > 0 ? (budgetDiff >= 0 ? '未超预算' : '已超预算') : '未设置'}
+              </p>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/30">
+                <div
+                  className={`h-full rounded-full ${dailyBudget > 0 && budgetDiff < 0 ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                  style={{ width: `${dailyBudget > 0 ? budgetRatio : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {myExpenseStats.daily.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {myExpenseStats.daily.slice(0, 10).map((day) => {
+                const overBudget = dailyBudget > 0 && day.amount > dailyBudget
+                return (
+                  <div
+                    key={day.date}
+                    className={`min-w-[116px] rounded-2xl border px-3 py-3 ${
+                      overBudget
+                        ? 'border-rose-300/20 bg-rose-400/10'
+                        : 'border-white/10 bg-black/15'
+                    }`}
+                  >
+                    <p className="text-[11px] font-black text-white/45">{formatExpenseDate(day.date)}</p>
+                    <p className="mt-1 text-sm font-black text-white">{formatCurrency(day.amount, currentTrip?.currency)}</p>
+                    {dailyBudget > 0 && (
+                      <p className={`mt-1 text-[10px] font-bold ${overBudget ? 'text-rose-100/80' : 'text-emerald-100/70'}`}>
+                        {overBudget ? '超预算' : '正常'}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </section>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-32">

@@ -190,6 +190,8 @@ type LocationPoint = {
   address: string
   latitude: number
   longitude: number
+  city?: string
+  adcode?: string
 }
 
 type RouteCalculationResult = {
@@ -438,15 +440,23 @@ const toLocationPoint = (poi: any, fallbackName: string): LocationPoint | null =
     address: normalizeAddress(poi),
     latitude,
     longitude,
+    city: poi.cityname || poi.city || poi.district,
+    adcode: poi.adcode,
   }
 }
 
-const searchPoiSuggestions = async (keyword: string): Promise<LocationPoint[]> => {
+const normalizeSearchCity = (city?: string | null) => {
+  const value = city?.trim()
+  return value || '全国'
+}
+
+const searchPoiSuggestions = async (keyword: string, searchCity?: string | null): Promise<LocationPoint[]> => {
   const trimmedKeyword = keyword.trim()
   if (trimmedKeyword.length < 2) return []
 
   const AMap = await loadAMapPlugin('AMap.AutoComplete')
-  const autocomplete = new AMap.AutoComplete({ city: '全国', citylimit: false })
+  const city = normalizeSearchCity(searchCity)
+  const autocomplete = new AMap.AutoComplete({ city, citylimit: city !== '全国' })
 
   return new Promise((resolve, reject) => {
     autocomplete.search(trimmedKeyword, (status: string, result: any) => {
@@ -464,12 +474,12 @@ const searchPoiSuggestions = async (keyword: string): Promise<LocationPoint[]> =
   })
 }
 
-const getLocationByKeyword = async (keyword: string): Promise<LocationPoint> => {
-  const suggestions = await searchPoiSuggestions(keyword)
+const getLocationByKeyword = async (keyword: string, searchCity?: string | null): Promise<LocationPoint> => {
+  const suggestions = await searchPoiSuggestions(keyword, searchCity)
   if (suggestions[0]) return suggestions[0]
 
   const AMap = await loadAMapPlugin('AMap.Geocoder')
-  const geocoder = new AMap.Geocoder({ city: '全国' })
+  const geocoder = new AMap.Geocoder({ city: normalizeSearchCity(searchCity) })
   return new Promise((resolve, reject) => {
     geocoder.getLocation(keyword, (status: string, result: any) => {
       const location = toLocationPoint(result?.geocodes?.[0], keyword)
@@ -490,11 +500,14 @@ const getLocationByCoordinates = async (latitude: number, longitude: number): Pr
       if (status === 'complete' && regeocode) {
         const pois = Array.isArray(regeocode.pois) ? regeocode.pois : []
         const firstPoi = pois[0]
+        const addressComponent = regeocode.addressComponent || {}
         resolve({
           name: firstPoi?.name || regeocode.formattedAddress || '当前位置',
           address: regeocode.formattedAddress || '',
           latitude,
           longitude,
+          city: addressComponent.city || addressComponent.province || addressComponent.district,
+          adcode: addressComponent.adcode,
         })
         return
       }
@@ -558,13 +571,14 @@ const getRouteDistance = async (
   originText: string,
   destinationText: string,
   transportMode: string,
+  searchCity?: string | null,
   knownOrigin?: LocationPoint | null,
   knownDestination?: LocationPoint | null,
 ): Promise<RouteCalculationResult> => {
   const routeMode = routeModeByTransport[transportMode] || 'driving'
   const [origin, destination] = await Promise.all([
-    knownOrigin || getLocationByKeyword(originText),
-    knownDestination || getLocationByKeyword(destinationText),
+    knownOrigin || getLocationByKeyword(originText, searchCity),
+    knownDestination || getLocationByKeyword(destinationText, searchCity),
   ])
   const straightPolyline = serializePolyline([
     [origin.longitude, origin.latitude],
@@ -753,6 +767,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [quickSaving, setQuickSaving] = useState(false)
   const [quickLocating, setQuickLocating] = useState(false)
   const [locatingField, setLocatingField] = useState<'origin' | 'destination' | 'place' | null>(null)
+  const [locationSearchCity, setLocationSearchCity] = useState(currentTrip.destination || '全国')
   const [mapCalculating, setMapCalculating] = useState(false)
   const [reordering, setReordering] = useState(false)
 
@@ -1261,6 +1276,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         position.coords.latitude,
         position.coords.longitude,
       )
+      setLocationSearchCity(location.adcode || location.city || currentTrip.destination || '全国')
       setQuickNoteForm((current) => ({
         ...current,
         place_name: location.name,
@@ -1286,6 +1302,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         position.coords.latitude,
         position.coords.longitude,
       )
+      setLocationSearchCity(location.adcode || location.city || currentTrip.destination || '全国')
 
       setForm((current) => {
         if (field === 'origin') {
@@ -1446,6 +1463,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
         origin,
         destination,
         form.transport_mode,
+        locationSearchCity,
         getKnownPoint(form.origin_name, form.origin_address, form.origin_latitude, form.origin_longitude),
         getKnownPoint(form.destination_name, form.destination_address, form.destination_latitude, form.destination_longitude),
       )
@@ -1705,6 +1723,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               editing={!!editingEntry}
               mapCalculating={mapCalculating}
               locatingField={locatingField}
+              locationSearchCity={locationSearchCity}
               onClose={closeForm}
               onSave={handleSave}
               onChange={updateForm}
@@ -2361,6 +2380,7 @@ function EntryFormModal({
   editing,
   mapCalculating,
   locatingField,
+  locationSearchCity,
   onClose,
   onSave,
   onChange,
@@ -2378,6 +2398,7 @@ function EntryFormModal({
   editing: boolean
   mapCalculating: boolean
   locatingField: 'origin' | 'destination' | 'place' | null
+  locationSearchCity: string
   onClose: () => void
   onSave: (event: React.FormEvent) => void
   onChange: <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => void
@@ -2459,6 +2480,7 @@ function EntryFormModal({
                   value={form.origin_name}
                   placeholder="例如：海口美兰机场"
                   selectedAddress={form.origin_address}
+                  searchCity={locationSearchCity}
                   onInputChange={(value) => {
                     onChange('origin_name', value)
                     onChange('origin_address', '')
@@ -2482,6 +2504,7 @@ function EntryFormModal({
                   value={form.destination_name}
                   placeholder="例如：文昌酒店"
                   selectedAddress={form.destination_address}
+                  searchCity={locationSearchCity}
                   onInputChange={(value) => {
                     onChange('destination_name', value)
                     onChange('destination_address', '')
@@ -2605,6 +2628,7 @@ function EntryFormModal({
                   value={form.place_name}
                   placeholder="地点/店名/酒店名"
                   selectedAddress={form.address}
+                  searchCity={locationSearchCity}
                   onInputChange={(value) => {
                     onChange('place_name', value)
                     onChange('address', '')
@@ -2835,6 +2859,7 @@ function LocationSearchInput({
   value,
   placeholder,
   selectedAddress,
+  searchCity,
   onInputChange,
   onSelect,
   onLocate,
@@ -2843,6 +2868,7 @@ function LocationSearchInput({
   value: string
   placeholder: string
   selectedAddress?: string
+  searchCity?: string
   onInputChange: (value: string) => void
   onSelect: (location: LocationPoint) => void
   onLocate?: () => void
@@ -2866,7 +2892,7 @@ function LocationSearchInput({
     let alive = true
     const timer = window.setTimeout(() => {
       setSearching(true)
-      searchPoiSuggestions(keyword)
+      searchPoiSuggestions(keyword, searchCity)
         .then((items) => {
           if (!alive) return
           setSuggestions(items)
@@ -2886,7 +2912,7 @@ function LocationSearchInput({
       alive = false
       window.clearTimeout(timer)
     }
-  }, [value])
+  }, [searchCity, value])
 
   return (
     <div className="relative">

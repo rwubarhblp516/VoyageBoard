@@ -194,6 +194,11 @@ type LocationPoint = {
   adcode?: string
 }
 
+type BrowserCoordinates = {
+  latitude: number
+  longitude: number
+}
+
 type RouteCalculationResult = {
   distanceKm: number
   durationMinutes: number | null
@@ -516,18 +521,52 @@ const getLocationByCoordinates = async (latitude: number, longitude: number): Pr
   })
 }
 
-const getBrowserLocation = () => new Promise<GeolocationPosition>((resolve, reject) => {
-  if (!navigator.geolocation) {
-    reject(new Error('当前浏览器不支持定位'))
-    return
+const getBrowserLocation = async (): Promise<BrowserCoordinates> => {
+  let browserError: any = null
+
+  if (navigator.geolocation) {
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 60000,
+        })
+      })
+      return {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      }
+    } catch (error) {
+      browserError = error
+    }
   }
 
-  navigator.geolocation.getCurrentPosition(resolve, reject, {
-    enableHighAccuracy: true,
-    timeout: 12000,
-    maximumAge: 60000,
-  })
-})
+  try {
+    const AMap = await loadAMapPlugin('AMap.Geolocation')
+    const geolocation = new AMap.Geolocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      convert: true,
+    })
+
+    return await new Promise<BrowserCoordinates>((resolve, reject) => {
+      geolocation.getCurrentPosition((status: string, result: any) => {
+        const position = result?.position
+        const latitude = Number(position?.lat)
+        const longitude = Number(position?.lng)
+        if (status === 'complete' && Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          resolve({ latitude, longitude })
+          return
+        }
+        reject(new Error(result?.message || result?.info || browserError?.message || '定位失败'))
+      })
+    })
+  } catch (error: any) {
+    if (browserError?.code === 1) throw browserError
+    throw error
+  }
+}
 
 const serializePolyline = (points: Array<[number, number]>) => JSON.stringify(points)
 
@@ -1273,8 +1312,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     try {
       const position = await getBrowserLocation()
       const location = await getLocationByCoordinates(
-        position.coords.latitude,
-        position.coords.longitude,
+        position.latitude,
+        position.longitude,
       )
       setLocationSearchCity(location.adcode || location.city || currentTrip.destination || '全国')
       setQuickNoteForm((current) => ({
@@ -1299,8 +1338,8 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     try {
       const position = await getBrowserLocation()
       const location = await getLocationByCoordinates(
-        position.coords.latitude,
-        position.coords.longitude,
+        position.latitude,
+        position.longitude,
       )
       setLocationSearchCity(location.adcode || location.city || currentTrip.destination || '全国')
 
@@ -2931,13 +2970,22 @@ function LocationSearchInput({
         />
         <button
           type="button"
-          onClick={onLocate}
+          onPointerDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+          }}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onLocate?.()
+          }}
           disabled={!onLocate || locating}
-          className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-white/45 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+          className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-white/45 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
           aria-label="定位当前位置"
+          aria-busy={searching || locating}
           title="定位当前位置"
         >
-          {locating || searching ? (
+          {locating ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <MapPin className="h-4 w-4" />
@@ -2991,10 +3039,10 @@ function TimeInput({ value, onChange }: { value: string; onChange: (value: strin
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-2">
+    <div className="block space-y-2">
       <span className="block pl-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/45">{label}</span>
       {children}
-    </label>
+    </div>
   )
 }
 

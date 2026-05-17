@@ -752,6 +752,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const [saving, setSaving] = useState(false)
   const [quickSaving, setQuickSaving] = useState(false)
   const [quickLocating, setQuickLocating] = useState(false)
+  const [locatingField, setLocatingField] = useState<'origin' | 'destination' | 'place' | null>(null)
   const [mapCalculating, setMapCalculating] = useState(false)
   const [reordering, setReordering] = useState(false)
 
@@ -1028,6 +1029,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     setMapCalculating(false)
     setQuickSaving(false)
     setQuickLocating(false)
+    setLocatingField(null)
     setQuickNoteOpen(false)
   }
 
@@ -1273,6 +1275,54 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       alert(message)
     } finally {
       setQuickLocating(false)
+    }
+  }
+
+  const handleLocateFormField = async (field: 'origin' | 'destination' | 'place') => {
+    setLocatingField(field)
+    try {
+      const position = await getBrowserLocation()
+      const location = await getLocationByCoordinates(
+        position.coords.latitude,
+        position.coords.longitude,
+      )
+
+      setForm((current) => {
+        if (field === 'origin') {
+          return {
+            ...current,
+            origin_name: location.name,
+            origin_address: location.address,
+            origin_latitude: String(location.latitude),
+            origin_longitude: String(location.longitude),
+            route_polyline: '',
+          }
+        }
+        if (field === 'destination') {
+          return {
+            ...current,
+            destination_name: location.name,
+            destination_address: location.address,
+            destination_latitude: String(location.latitude),
+            destination_longitude: String(location.longitude),
+            route_polyline: '',
+          }
+        }
+        return {
+          ...current,
+          place_name: location.name,
+          address: location.address,
+          latitude: String(location.latitude),
+          longitude: String(location.longitude),
+        }
+      })
+    } catch (error: any) {
+      const message = error?.code === 1
+        ? '定位权限被拒绝，请在浏览器里允许定位'
+        : error?.message || '定位失败'
+      alert(message)
+    } finally {
+      setLocatingField(null)
     }
   }
 
@@ -1654,10 +1704,12 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               saving={saving}
               editing={!!editingEntry}
               mapCalculating={mapCalculating}
+              locatingField={locatingField}
               onClose={closeForm}
               onSave={handleSave}
               onChange={updateForm}
               onTypeChange={handleFormTypeChange}
+              onLocateField={handleLocateFormField}
               onMapCalculate={handleMapCalculate}
               existingImages={editingEntry?.images || []}
               pendingImageFiles={pendingImageFiles}
@@ -2308,10 +2360,12 @@ function EntryFormModal({
   saving,
   editing,
   mapCalculating,
+  locatingField,
   onClose,
   onSave,
   onChange,
   onTypeChange,
+  onLocateField,
   onMapCalculate,
   existingImages,
   pendingImageFiles,
@@ -2323,10 +2377,12 @@ function EntryFormModal({
   saving: boolean
   editing: boolean
   mapCalculating: boolean
+  locatingField: 'origin' | 'destination' | 'place' | null
   onClose: () => void
   onSave: (event: React.FormEvent) => void
   onChange: <K extends keyof EntryForm>(key: K, value: EntryForm[K]) => void
   onTypeChange: (type: TimelineEntryType) => void
+  onLocateField: (field: 'origin' | 'destination' | 'place') => void
   onMapCalculate: () => void
   existingImages: TimelineImage[]
   pendingImageFiles: File[]
@@ -2417,6 +2473,8 @@ function EntryFormModal({
                     onChange('origin_longitude', String(location.longitude))
                     onChange('route_polyline', '')
                   }}
+                  onLocate={() => onLocateField('origin')}
+                  locating={locatingField === 'origin'}
                 />
               </Field>
               <Field label="终点">
@@ -2438,6 +2496,8 @@ function EntryFormModal({
                     onChange('destination_longitude', String(location.longitude))
                     onChange('route_polyline', '')
                   }}
+                  onLocate={() => onLocateField('destination')}
+                  locating={locatingField === 'destination'}
                 />
               </Field>
             </div>
@@ -2557,6 +2617,8 @@ function EntryFormModal({
                     onChange('latitude', String(location.latitude))
                     onChange('longitude', String(location.longitude))
                   }}
+                  onLocate={() => onLocateField('place')}
+                  locating={locatingField === 'place'}
                 />
               </Field>
               <Field label="地址">
@@ -2775,12 +2837,16 @@ function LocationSearchInput({
   selectedAddress,
   onInputChange,
   onSelect,
+  onLocate,
+  locating = false,
 }: {
   value: string
   placeholder: string
   selectedAddress?: string
   onInputChange: (value: string) => void
   onSelect: (location: LocationPoint) => void
+  onLocate?: () => void
+  locating?: boolean
 }) {
   const [suggestions, setSuggestions] = useState<LocationPoint[]>([])
   const [searching, setSearching] = useState(false)
@@ -2835,13 +2901,22 @@ function LocationSearchInput({
             if (userTouched.current) setOpen(suggestions.length > 0)
           }}
           placeholder={placeholder}
-          className="glass-input pr-11"
+          className="glass-input pr-12"
         />
-        {searching ? (
-          <Loader2 className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/35" />
-        ) : (
-          <MapPin className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-        )}
+        <button
+          type="button"
+          onClick={onLocate}
+          disabled={!onLocate || locating}
+          className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl text-white/45 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label="定位当前位置"
+          title="定位当前位置"
+        >
+          {locating || searching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <MapPin className="h-4 w-4" />
+          )}
+        </button>
       </div>
 
       {selectedAddress && (

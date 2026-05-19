@@ -190,6 +190,15 @@ export default function GuidePage() {
     return groups
   }, [entries])
 
+  const guideEntries = useMemo(() => {
+    const dayOrder = new Map((days || []).map((day) => [day.id, day.day_index]))
+    return [...(entries || [])].sort((a, b) => {
+      const dayDiff = (dayOrder.get(a.day_id) || 0) - (dayOrder.get(b.day_id) || 0)
+      if (dayDiff !== 0) return dayDiff
+      return (a.sort_order || 0) - (b.sort_order || 0)
+    })
+  }, [days, entries])
+
   const guideStats = useMemo(() => {
     const allEntries = entries || []
     const totalExpense = (expenses || []).reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
@@ -249,6 +258,19 @@ export default function GuidePage() {
             </div>
           </section>
 
+          <section className="glass-card rounded-[32px] border border-white/10 p-5 sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-white">全程路线总览</h2>
+                <p className="mt-1 text-xs font-bold text-white/45">所有已记录点位会整合到这一张地图里，按行程顺序连线。</p>
+              </div>
+              <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-white/55">
+                {guideEntries.length} 条素材
+              </span>
+            </div>
+            <GuideOverviewMap entries={guideEntries} />
+          </section>
+
           {(days || []).map((day) => {
             const dayEntries = sortEntries(entriesByDay.get(day.id) || [])
             if (dayEntries.length === 0) return null
@@ -265,9 +287,7 @@ export default function GuidePage() {
                     </span>
                   </div>
 
-                  <GuideDayMap dayId={day.id} entries={dayEntries} />
-
-                  <div className="mt-5 space-y-3">
+                  <div className="space-y-3">
                     {dayEntries.map((entry) => <GuideEntryCard key={entry.id} entry={entry} />)}
                   </div>
                 </div>
@@ -363,8 +383,8 @@ function GuideList({ title, icon, entries, empty }: { title: string; icon: React
   )
 }
 
-function GuideDayMap({ dayId, entries }: { dayId: string; entries: TimelineEntry[] }) {
-  const [containerId] = useState(() => `guide-map-${dayId}-${crypto.randomUUID()}`)
+function GuideOverviewMap({ entries }: { entries: TimelineEntry[] }) {
+  const [containerId] = useState(() => `guide-overview-map-${crypto.randomUUID()}`)
   const [mapError, setMapError] = useState('')
 
   const mapPoints = useMemo(() => {
@@ -436,7 +456,7 @@ function GuideDayMap({ dayId, entries }: { dayId: string; entries: TimelineEntry
   if (mapPoints.length === 0) {
     return (
       <div className="rounded-[24px] border border-white/10 bg-white/5 p-4 text-sm font-bold text-white/45">
-        这一天还没有可展示在地图上的点位。
+        还没有可展示在地图上的点位。
       </div>
     )
   }

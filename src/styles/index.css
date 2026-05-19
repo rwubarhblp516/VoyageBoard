@@ -46,6 +46,7 @@
 }
 
 @layer base {
+  :root { --voyageboard-asset-revision: "2026-05-19-css-republish"; }
   body { @apply bg-bg-base text-text-main antialiased; }
 }
 

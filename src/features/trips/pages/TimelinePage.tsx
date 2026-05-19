@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -799,6 +799,7 @@ export default function TimelinePage() {
 
 function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const [activeDayIndex, setActiveDayIndex] = useState(() => getInitialTimelineDayIndex(currentTrip))
@@ -1660,6 +1661,14 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
           <div className="flex items-center gap-3 text-sm font-bold text-white/65">
             <MapPinned className="w-5 h-5 text-white/50" />
             <span className="truncate">{currentTrip.destination || '目的地待补充'}</span>
+            <button
+              type="button"
+              onClick={() => navigate('/guide')}
+              className="ml-1 inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-xs font-black text-white hover:bg-white hover:text-black"
+            >
+              <Newspaper className="h-4 w-4" />
+              攻略预览
+            </button>
           </div>
         </div>
       </section>

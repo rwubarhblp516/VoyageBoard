@@ -17,6 +17,7 @@ import ExpenseListPage from '@/features/expenses/pages/ExpenseListPage'
 import SettlementPage from '@/features/expenses/pages/SettlementPage'
 import ChecklistPage from '@/features/trips/pages/ChecklistPage'
 import TimelinePage from '@/features/trips/pages/TimelinePage'
+import GuidePage from '@/features/trips/pages/GuidePage'
 import JoinTripPage from '@/features/trips/pages/JoinTripPage'
 import FadeContent from '@/components/FadeContent'
 import { ArrowLeft, Utensils, Hotel, Bus, Plane, Train, Car, Ticket, ShoppingBag, MoreHorizontal, ShoppingBasket, Tag } from 'lucide-react'
@@ -410,6 +411,7 @@ function App() {
                 <Route index element={<TripDashboard />} />
                 <Route path="checklist" element={<ChecklistPage />} />
                 <Route path="timeline" element={<TimelinePage />} />
+                <Route path="guide" element={<GuidePage />} />
                 <Route path="expenses" element={<ExpenseListPage />} />
                 <Route path="settlement" element={<SettlementPage />} />
                 <Route path="members" element={<MembersPage />} />

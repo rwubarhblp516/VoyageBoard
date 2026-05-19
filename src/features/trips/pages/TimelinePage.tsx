@@ -44,6 +44,7 @@ import {
   MapPin,
   MapPinned,
   Maximize2,
+  MessageCircle,
   Minimize2,
   MoveDown,
   MoveUp,
@@ -53,6 +54,7 @@ import {
   Plus,
   Route,
   Ship,
+  Send,
   Star,
   Train,
   Trash2,
@@ -118,6 +120,18 @@ type TimelineImage = {
   created_by_member_id: string | null
 }
 
+type TimelineComment = {
+  id: string
+  trip_id: string
+  day_id: string
+  timeline_entry_id: string
+  content: string
+  created_by_member_id: string | null
+  created_at: string | null
+  updated_at: string | null
+  created_by_member?: { display_name: string } | null
+}
+
 type TimelineEntry = {
   id: string
   trip_id: string
@@ -140,6 +154,7 @@ type TimelineEntry = {
   include_in_guide: boolean
   travel_segments?: TravelSegment[]
   images?: TimelineImage[]
+  comments?: TimelineComment[]
   created_by_member?: { display_name: string } | null
 }
 
@@ -802,6 +817,9 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     include_in_guide: true,
   })
   const [pendingImageFiles, setPendingImageFiles] = useState<File[]>([])
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
+  const [savingCommentEntryId, setSavingCommentEntryId] = useState<string | null>(null)
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [quickSaving, setQuickSaving] = useState(false)
   const [quickLocating, setQuickLocating] = useState(false)
@@ -887,7 +905,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
       if (!activeDay) return []
       const { data, error } = await supabase
         .from('timeline_entries')
-        .select('*, created_by_member:trip_members!timeline_entries_created_by_member_id_fkey(display_name), travel_segments(*), images:timeline_entry_images(*)')
+        .select('*, created_by_member:trip_members!timeline_entries_created_by_member_id_fkey(display_name), travel_segments(*), images:timeline_entry_images(*), comments:timeline_entry_comments(*, created_by_member:trip_members!timeline_entry_comments_created_by_member_id_fkey(display_name))')
         .eq('trip_id', currentTrip.id)
         .eq('day_id', activeDay.id)
         .order('sort_order', { ascending: true })
@@ -1399,6 +1417,60 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
   }
 
+  const handleAddComment = async (entry: TimelineEntry) => {
+    if (!activeDay || !currentMember) {
+      alert('成员信息还没有准备好')
+      return
+    }
+
+    const content = (commentDrafts[entry.id] || '').trim()
+    if (!content) return
+
+    setSavingCommentEntryId(entry.id)
+    try {
+      const { error } = await supabase
+        .from('timeline_entry_comments')
+        .insert({
+          trip_id: currentTrip.id,
+          day_id: activeDay.id,
+          timeline_entry_id: entry.id,
+          content,
+          created_by_member_id: currentMember.id,
+          updated_at: new Date().toISOString(),
+        })
+      if (error) throw error
+
+      setCommentDrafts((current) => ({ ...current, [entry.id]: '' }))
+      await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay.id] })
+    } catch (error: any) {
+      alert(error.message || '补充失败')
+    } finally {
+      setSavingCommentEntryId(null)
+    }
+  }
+
+  const handleDeleteComment = async (comment: TimelineComment) => {
+    if (comment.created_by_member_id !== currentMember?.id && currentMember?.role !== 'owner') {
+      alert('只能删除自己的补充')
+      return
+    }
+    if (!window.confirm('确认删除这条补充吗？')) return
+
+    setDeletingCommentId(comment.id)
+    try {
+      const { error } = await supabase
+        .from('timeline_entry_comments')
+        .delete()
+        .eq('id', comment.id)
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
+    } catch (error: any) {
+      alert(error.message || '删除补充失败')
+    } finally {
+      setDeletingCommentId(null)
+    }
+  }
+
   const persistEntryOrder = async (orderedEntries: TimelineEntry[]) => {
     if (!activeDay) return
     setReordering(true)
@@ -1668,6 +1740,14 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
                       onMoveDown={() => handleMoveEntry(entry.id, 1)}
                       onEdit={() => openEditForm(entry)}
                       onDelete={() => handleDelete(entry)}
+                      commentDraft={commentDrafts[entry.id] || ''}
+                      onCommentDraftChange={(value) => setCommentDrafts((current) => ({ ...current, [entry.id]: value }))}
+                      onAddComment={() => handleAddComment(entry)}
+                      onDeleteComment={handleDeleteComment}
+                      savingComment={savingCommentEntryId === entry.id}
+                      deletingCommentId={deletingCommentId}
+                      currentMemberId={currentMember?.id || null}
+                      currentMemberRole={currentMember?.role || null}
                       canDelete={entry.created_by_member_id === currentMember?.id || currentMember?.role === 'owner'}
                     />
                   ))}
@@ -2044,6 +2124,14 @@ function TimelineCard({
   onMoveDown,
   onEdit,
   onDelete,
+  commentDraft,
+  onCommentDraftChange,
+  onAddComment,
+  onDeleteComment,
+  savingComment,
+  deletingCommentId,
+  currentMemberId,
+  currentMemberRole,
   canDelete,
 }: {
   entry: TimelineEntry
@@ -2055,6 +2143,14 @@ function TimelineCard({
   onMoveDown: () => void
   onEdit: () => void
   onDelete: () => void
+  commentDraft: string
+  onCommentDraftChange: (value: string) => void
+  onAddComment: () => void
+  onDeleteComment: (comment: TimelineComment) => void
+  savingComment: boolean
+  deletingCommentId: string | null
+  currentMemberId: string | null
+  currentMemberRole: string | null
   canDelete: boolean
 }) {
   const meta = getEntryMeta(entry.type)
@@ -2088,6 +2184,9 @@ function TimelineCard({
         entry.rating ? `${entry.rating}星` : null,
         entry.recommend_level === 'recommend' ? '推荐' : entry.recommend_level === 'avoid' ? '避坑' : null,
       ].filter(Boolean).join(' · ')
+  const comments = [...(entry.comments || [])].sort((a, b) => (
+    new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+  ))
 
   return (
     <motion.article
@@ -2195,6 +2294,68 @@ function TimelineCard({
               ))}
             </div>
           )}
+
+          <div className="mt-4 rounded-[22px] border border-white/10 bg-black/15 p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-black text-white/55">
+                <MessageCircle className="h-4 w-4" />
+                补充
+                {comments.length > 0 && (
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/45">
+                    {comments.length}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {comments.length > 0 && (
+              <div className="mb-3 space-y-2">
+                {comments.map((comment) => {
+                  const canDeleteComment = comment.created_by_member_id === currentMemberId || currentMemberRole === 'owner'
+                  return (
+                    <div key={comment.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-[11px] font-black text-white/50">
+                          {comment.created_by_member?.display_name || '成员'}
+                        </span>
+                        {canDeleteComment && (
+                          <button
+                            type="button"
+                            onClick={() => onDeleteComment(comment)}
+                            disabled={deletingCommentId === comment.id}
+                            className="shrink-0 rounded-lg p-1 text-white/30 hover:bg-white/10 hover:text-red-200 disabled:opacity-30"
+                            aria-label="删除补充"
+                          >
+                            {deletingCommentId === comment.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                      </div>
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-white/75">{comment.content}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <textarea
+                value={commentDraft}
+                onChange={(event) => onCommentDraftChange(event.target.value)}
+                placeholder="补一句体验、提醒或避坑..."
+                rows={1}
+                className="min-h-11 flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-bold leading-5 text-white outline-none placeholder:text-white/30 focus:border-white/25"
+              />
+              <button
+                type="button"
+                onClick={onAddComment}
+                disabled={savingComment || !commentDraft.trim()}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-black disabled:bg-white/10 disabled:text-white/25"
+                aria-label="添加补充"
+              >
+                {savingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
 
           {/* 底部：标签 + 操作按钮 */}
           <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/10 pt-3">

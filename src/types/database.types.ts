@@ -237,6 +237,68 @@ export type Database = {
           },
         ]
       }
+      timeline_entry_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          created_by_member_id: string | null
+          day_id: string
+          id: string
+          timeline_entry_id: string
+          trip_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          created_by_member_id?: string | null
+          day_id: string
+          id?: string
+          timeline_entry_id: string
+          trip_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          created_by_member_id?: string | null
+          day_id?: string
+          id?: string
+          timeline_entry_id?: string
+          trip_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "timeline_entry_comments_created_by_member_id_fkey"
+            columns: ["created_by_member_id"]
+            isOneToOne: false
+            referencedRelation: "trip_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_entry_comments_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "trip_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_entry_comments_timeline_entry_id_fkey"
+            columns: ["timeline_entry_id"]
+            isOneToOne: false
+            referencedRelation: "timeline_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "timeline_entry_comments_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       timeline_entries: {
         Row: {
           address: string | null

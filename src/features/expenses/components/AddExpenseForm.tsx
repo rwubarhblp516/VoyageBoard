@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useTripStore } from '@/stores/useTripStore'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, X, ChevronDown, Check, ImagePlus, Star, Newspaper, Trash2 } from 'lucide-react'
+import { Loader2, X, ChevronDown, Check, ImagePlus, Star, Newspaper, Trash2, CalendarDays } from 'lucide-react'
 import { useState } from 'react'
 import { TripMember } from '@/types/trip'
 import AppleSelect from '@/components/AppleSelect'
@@ -54,6 +54,15 @@ const calculateDayIndex = (tripStartDate: string, dateText: string) => {
   const date = new Date(`${dateText}T00:00:00`)
   const diff = Math.round((date.getTime() - start.getTime()) / 86400000)
   return Math.max(1, diff + 1)
+}
+
+const getLocalDateText = (offsetDays = 0) => {
+  const date = new Date()
+  date.setDate(date.getDate() + offsetDays)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 const getCategoryLabel = (category: string, customCategoryText: string) => {
@@ -188,7 +197,7 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
       amount: editingExpense ? (Number(editingExpense.amount) / 100).toString() : '',
       category: editingExpense?.category ? (knownCategories.includes(editingExpense.category) ? editingExpense.category : 'other') : 'other',
       payer_member_id: editingExpense?.payer_member_id || currentMemberId,
-      expense_date: editingExpense?.expense_date || new Date().toISOString().split('T')[0],
+      expense_date: editingExpense?.expense_date || getLocalDateText(),
       participant_ids: editingExpense?.participants?.map((p: any) => p.member_id) || members?.map(m => m.id) || [],
       split_type: editingExpense?.participants?.length === 1 && editingExpense.participants[0].member_id === editingExpense.payer_member_id ? 'individual' : 'equal',
     }
@@ -198,6 +207,7 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
   const splitType = watch('split_type')
   const payerId = watch('payer_member_id')
   const categoryId = watch('category')
+  const expenseDate = watch('expense_date')
 
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [payerOpen, setPayerOpen] = useState(false)
@@ -442,6 +452,45 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <section className="rounded-[28px] border border-amber-300/15 bg-amber-300/10 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-[10px] font-bold text-amber-50/80 uppercase tracking-widest">
+                <CalendarDays className="h-4 w-4" />
+                消费日期
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setValue('expense_date', getLocalDateText(-1))}
+                  className={`rounded-xl px-3 py-1.5 text-[11px] font-black transition-colors ${
+                    expenseDate === getLocalDateText(-1)
+                      ? 'bg-white text-black'
+                      : 'bg-white/10 text-white/70 hover:bg-white/15'
+                  }`}
+                >
+                  昨天
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setValue('expense_date', getLocalDateText())}
+                  className={`rounded-xl px-3 py-1.5 text-[11px] font-black transition-colors ${
+                    expenseDate === getLocalDateText()
+                      ? 'bg-white text-black'
+                      : 'bg-white/10 text-white/70 hover:bg-white/15'
+                  }`}
+                >
+                  今天
+                </button>
+              </div>
+            </div>
+            <input
+              {...register('expense_date')}
+              type="date"
+              className="mt-3 w-full bg-black/20 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-base font-black shadow-inner [color-scheme:dark]"
+            />
+            <p className="mt-2 text-xs font-bold text-amber-50/55">补记昨天的消费时，先点“昨天”，统计和行程关联都会归到昨天。</p>
+          </section>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">金额</label>

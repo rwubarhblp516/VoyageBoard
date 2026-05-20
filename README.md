@@ -171,16 +171,18 @@ git status --short
 
 ## Routing
 
-The SPA fallback lives in:
+SPA route rewrites live in:
 
 ```text
 public/_redirects
 ```
 
-Current rule:
+Do not use a global catch-all rule like this:
 
 ```text
 /* /index.html 200
 ```
 
-This is for Cloudflare Pages. If a deployment error references `/workers/scripts/...`, the project is being deployed as a Worker instead of a Pages project.
+That catch-all makes missing hashed assets such as `/assets/index-xxxx.css` resolve to `index.html`, which can poison Cloudflare/browser caches during deployment propagation. Instead, only known app routes should rewrite to `/index.html`, and `public/404.html` must exist so unknown paths return a real 404.
+
+If a deployment error references `/workers/scripts/...`, the project is being deployed as a Worker instead of a Pages project.

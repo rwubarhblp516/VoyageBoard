@@ -1,1 +1,11 @@
-/* /index.html 200
+/login /index.html 200
+/join/* /index.html 200
+/trips /index.html 200
+/trips/* /index.html 200
+/checklist /index.html 200
+/timeline /index.html 200
+/guide /index.html 200
+/expenses /index.html 200
+/settlement /index.html 200
+/members /index.html 200
+/settings /index.html 200

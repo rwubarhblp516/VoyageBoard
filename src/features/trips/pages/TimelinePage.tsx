@@ -239,6 +239,8 @@ type PendingImageUploadJob = {
   createdAt: string
 }
 
+type TimelineEntryPatch = Partial<Pick<TimelineEntry, 'include_in_guide' | 'recommend_level' | 'tags'>>
+
 declare global {
   interface Window {
     AMap?: any
@@ -1472,6 +1474,27 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     }
   }
 
+  const handlePatchEntry = async (entry: TimelineEntry, patch: TimelineEntryPatch) => {
+    const previousEntries = entries || []
+    queryClient.setQueryData<TimelineEntry[]>(
+      ['timelineEntries', currentTrip.id, activeDay?.id],
+      previousEntries.map((item) => item.id === entry.id ? { ...item, ...patch } : item),
+    )
+
+    const { error } = await supabase
+      .from('timeline_entries')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', entry.id)
+
+    if (error) {
+      queryClient.setQueryData(['timelineEntries', currentTrip.id, activeDay?.id], previousEntries)
+      alert(error.message || '更新素材状态失败')
+      return
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
+  }
+
   const persistEntryOrder = async (orderedEntries: TimelineEntry[]) => {
     if (!activeDay) return
     setReordering(true)
@@ -1632,6 +1655,15 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
 
   const activeExpectedDay = expectedDays.find((day) => day.day_index === activeDayIndex) || expectedDays[0]
   const activeDateLabel = activeDay?.date || activeExpectedDay?.date || currentTrip.start_date
+  const materialStats = useMemo(() => {
+    const guideEntries = sortedEntries.filter((entry) => entry.include_in_guide)
+    return {
+      total: sortedEntries.length,
+      guide: guideEntries.length,
+      needsPolish: guideEntries.filter((entry) => getEntryMaterialHints(entry).length > 0).length,
+      photos: sortedEntries.reduce((sum, entry) => sum + (entry.images?.length || 0), 0),
+    }
+  }, [sortedEntries])
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
@@ -1671,6 +1703,13 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
             </button>
           </div>
         </div>
+      </section>
+
+      <section className="mb-6 grid grid-cols-4 gap-2 sm:gap-3">
+        <MaterialStatCard label="记录" value={materialStats.total} />
+        <MaterialStatCard label="进攻略" value={materialStats.guide} tone="emerald" />
+        <MaterialStatCard label="待补充" value={materialStats.needsPolish} tone={materialStats.needsPolish > 0 ? 'amber' : 'muted'} />
+        <MaterialStatCard label="照片" value={materialStats.photos} />
       </section>
 
       <div className="mb-8 overflow-x-auto no-scrollbar">
@@ -1753,6 +1792,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
                       onCommentDraftChange={(value) => setCommentDrafts((current) => ({ ...current, [entry.id]: value }))}
                       onAddComment={() => handleAddComment(entry)}
                       onDeleteComment={handleDeleteComment}
+                      onPatchEntry={(patch) => handlePatchEntry(entry, patch)}
                       savingComment={savingCommentEntryId === entry.id}
                       deletingCommentId={deletingCommentId}
                       currentMemberId={currentMember?.id || null}
@@ -1883,6 +1923,22 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
           )}
         </AnimatePresence>
       </ModalPortal>
+    </div>
+  )
+}
+
+function MaterialStatCard({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'emerald' | 'amber' | 'muted' }) {
+  const toneClass = {
+    default: 'border-white/10 bg-white/5 text-white',
+    emerald: 'border-emerald-300/15 bg-emerald-400/10 text-emerald-50',
+    amber: 'border-amber-300/20 bg-amber-400/10 text-amber-50',
+    muted: 'border-white/10 bg-black/10 text-white/55',
+  }[tone]
+
+  return (
+    <div className={`rounded-2xl border px-3 py-3 text-center ${toneClass}`}>
+      <div className="text-xl font-black tabular-nums sm:text-2xl">{value}</div>
+      <div className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] opacity-55">{label}</div>
     </div>
   )
 }
@@ -2124,6 +2180,28 @@ function DailyRouteMap({ entries, activeDateLabel }: { entries: TimelineEntry[];
   )
 }
 
+function getEntryMaterialHints(entry: TimelineEntry) {
+  const hints: string[] = []
+  const segment = entry.travel_segments?.[0]
+  const hasText = Boolean(entry.content?.trim() || segment?.note?.trim() || (entry.comments || []).length > 0)
+
+  if ((entry.tags || []).includes('待补充')) hints.push('待补充')
+
+  if (entry.type === 'transport') {
+    if (!segment?.distance_km) hints.push('补距离')
+    if (!segment?.origin_latitude || !segment?.destination_latitude) hints.push('补地点')
+    if (!hasText) hints.push('补路况')
+    return Array.from(new Set(hints))
+  }
+
+  if (!entry.place_name && ['place', 'meal', 'hotel', 'activity'].includes(entry.type)) hints.push('补地点')
+  if (!hasText) hints.push('补体验')
+  if (entry.recommend_level === 'normal' && entry.type !== 'note') hints.push('标推荐/避坑')
+  if ((entry.images || []).length === 0 && ['place', 'meal', 'hotel', 'activity'].includes(entry.type)) hints.push('补照片')
+
+  return Array.from(new Set(hints))
+}
+
 function TimelineCard({
   entry,
   index,
@@ -2138,6 +2216,7 @@ function TimelineCard({
   onCommentDraftChange,
   onAddComment,
   onDeleteComment,
+  onPatchEntry,
   savingComment,
   deletingCommentId,
   currentMemberId,
@@ -2157,6 +2236,7 @@ function TimelineCard({
   onCommentDraftChange: (value: string) => void
   onAddComment: () => void
   onDeleteComment: (comment: TimelineComment) => void
+  onPatchEntry: (patch: TimelineEntryPatch) => void
   savingComment: boolean
   deletingCommentId: string | null
   currentMemberId: string | null
@@ -2197,6 +2277,27 @@ function TimelineCard({
   const comments = [...(entry.comments || [])].sort((a, b) => (
     new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
   ))
+  const materialHints = getEntryMaterialHints(entry)
+  const isMarkedTodo = (entry.tags || []).includes('待补充')
+  const materialLabel = !entry.include_in_guide
+    ? '不入攻略'
+    : materialHints.length > 0
+      ? '待补充'
+      : '已完善'
+  const materialTone = !entry.include_in_guide
+    ? 'bg-white/5 text-white/40 border-white/10'
+    : materialHints.length > 0
+      ? 'bg-amber-400/15 text-amber-100 border-amber-300/20'
+      : 'bg-emerald-400/15 text-emerald-100 border-emerald-300/20'
+
+  const toggleTodoTag = () => {
+    const tags = entry.tags || []
+    onPatchEntry({
+      tags: isMarkedTodo
+        ? tags.filter((tag) => tag !== '待补充')
+        : [...tags, '待补充'],
+    })
+  }
 
   return (
     <motion.article
@@ -2219,6 +2320,9 @@ function TimelineCard({
               <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.15em] ${meta.tone}`}>
                 {entry.type === 'transport' ? <TransportIcon className="w-3 h-3" /> : <Icon className="w-3 h-3" />}
                 {meta.label}
+              </span>
+              <span className={`mr-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black ${materialTone}`}>
+                {materialLabel}
               </span>
               <div className="flex shrink-0 items-center gap-1">
                 <button
@@ -2304,6 +2408,72 @@ function TimelineCard({
               ))}
             </div>
           )}
+
+          <div className="mt-4 rounded-[22px] border border-white/10 bg-white/[0.04] p-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onPatchEntry({ include_in_guide: !entry.include_in_guide })}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black transition-all ${
+                  entry.include_in_guide
+                    ? 'border-emerald-300/20 bg-emerald-400/15 text-emerald-100'
+                    : 'border-white/10 bg-black/10 text-white/45 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <Newspaper className="h-3.5 w-3.5" />
+                {entry.include_in_guide ? '进攻略' : '不进攻略'}
+              </button>
+              {entry.type !== 'transport' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onPatchEntry({ recommend_level: entry.recommend_level === 'recommend' ? 'normal' : 'recommend', include_in_guide: true })}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black transition-all ${
+                      entry.recommend_level === 'recommend'
+                        ? 'border-yellow-300/25 bg-yellow-300/15 text-yellow-100'
+                        : 'border-white/10 bg-black/10 text-white/45 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <Star className="h-3.5 w-3.5" />
+                    推荐
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onPatchEntry({ recommend_level: entry.recommend_level === 'avoid' ? 'normal' : 'avoid', include_in_guide: true })}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black transition-all ${
+                      entry.recommend_level === 'avoid'
+                        ? 'border-rose-300/25 bg-rose-400/15 text-rose-100'
+                        : 'border-white/10 bg-black/10 text-white/45 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    避坑
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={toggleTodoTag}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-black transition-all ${
+                  isMarkedTodo
+                    ? 'border-amber-300/25 bg-amber-400/15 text-amber-100'
+                    : 'border-white/10 bg-black/10 text-white/45 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                待补充
+              </button>
+            </div>
+            {entry.include_in_guide && materialHints.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {materialHints.slice(0, 4).map((hint) => (
+                  <span key={hint} className="rounded-full bg-amber-400/10 px-2.5 py-1 text-[10px] font-black text-amber-100/75">
+                    {hint}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="mt-4 rounded-[22px] border border-white/10 bg-black/15 p-3">
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -2751,10 +2921,10 @@ function EntryFormModal({
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="出发时间">
+              <Field label="出发时间（可选）">
                 <input type="time" value={form.departure_time} onChange={(event) => onChange('departure_time', event.target.value)} className="glass-input" />
               </Field>
-              <Field label="到达时间">
+              <Field label="到达时间（可选）">
                 <input type="time" value={form.arrival_time} onChange={(event) => onChange('arrival_time', event.target.value)} className="glass-input" />
               </Field>
             </div>
@@ -2824,15 +2994,6 @@ function EntryFormModal({
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="开始时间">
-                <input type="time" value={form.start_time} onChange={(event) => onChange('start_time', event.target.value)} className="glass-input" />
-              </Field>
-              <Field label="结束时间">
-                <input type="time" value={form.end_time} onChange={(event) => onChange('end_time', event.target.value)} className="glass-input" />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="地点">
                 <LocationSearchInput
                   value={form.place_name}
@@ -2859,6 +3020,26 @@ function EntryFormModal({
                 <input value={form.address} onChange={(event) => onChange('address', event.target.value)} placeholder="可选" className="glass-input" />
               </Field>
             </div>
+
+            <details className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+              <summary className="cursor-pointer select-none text-sm font-black text-white/70 marker:text-white/35">
+                时间信息（可选，用于排序和攻略时间线）
+              </summary>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="开始时间">
+                  <TimeInput value={form.start_time} onChange={(value) => onChange('start_time', value)} />
+                </Field>
+                <Field label="结束时间">
+                  <TimeInput value={form.end_time} onChange={(value) => onChange('end_time', value)} />
+                </Field>
+              </div>
+              {duration !== null && (
+                <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/70">
+                  <Clock3 className="w-4 h-4" />
+                  已根据时间自动计算耗时：{formatDuration(duration)}
+                </div>
+              )}
+            </details>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="推荐程度">
@@ -2887,13 +3068,6 @@ function EntryFormModal({
                 />
               </Field>
             </div>
-
-            {duration !== null && (
-              <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/70">
-                <Clock3 className="w-4 h-4" />
-                已根据时间自动计算耗时：{formatDuration(duration)}
-              </div>
-            )}
 
             <Field label="标签">
               <input
@@ -3005,7 +3179,7 @@ function QuickNoteModal({
           </Field>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="时间">
+            <Field label="记录时间（自动，可不管）">
               <TimeInput
                 value={form.start_time}
                 onChange={(value) => onChange({ ...form, start_time: value })}

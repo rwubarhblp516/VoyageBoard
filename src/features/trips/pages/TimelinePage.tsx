@@ -1872,6 +1872,7 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
               saving={quickSaving}
               pendingImageFiles={pendingImageFiles}
               locating={quickLocating}
+              locationSearchCity={locationSearchCity}
               onChange={(nextForm) => setQuickNoteForm(nextForm)}
               onLocate={handleQuickLocate}
               onClose={closeForm}
@@ -2952,6 +2953,7 @@ function QuickNoteModal({
   saving,
   pendingImageFiles,
   locating,
+  locationSearchCity,
   onChange,
   onLocate,
   onClose,
@@ -2963,6 +2965,7 @@ function QuickNoteModal({
   saving: boolean
   pendingImageFiles: File[]
   locating: boolean
+  locationSearchCity: string
   onChange: (form: QuickNoteForm) => void
   onLocate: () => void
   onClose: () => void
@@ -3011,27 +3014,30 @@ function QuickNoteModal({
             <GuideToggle checked={form.include_in_guide} onChange={(checked) => onChange({ ...form, include_in_guide: checked })} />
           </div>
 
-          <section className="rounded-[24px] border border-white/10 bg-white/5 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-sm font-black text-white flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  当前位置
-                </h3>
-                <p className="mt-1 line-clamp-2 text-xs font-bold text-white/45">
-                  {form.place_name ? `${form.place_name}${form.address ? ` · ${form.address}` : ''}` : '点击后会请求浏览器定位，并写入这条快速记录。'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onLocate}
-                disabled={locating}
-                className="shrink-0 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-xs font-black text-white hover:bg-white/15 disabled:opacity-40"
-              >
-                {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : '定位'}
-              </button>
-            </div>
-          </section>
+          <Field label="地点">
+            <LocationSearchInput
+              value={form.place_name}
+              placeholder="搜索地点/店名/酒店名"
+              selectedAddress={form.address}
+              searchCity={locationSearchCity}
+              onInputChange={(value) => onChange({
+                ...form,
+                place_name: value,
+                address: '',
+                latitude: '',
+                longitude: '',
+              })}
+              onSelect={(location) => onChange({
+                ...form,
+                place_name: location.name,
+                address: location.address,
+                latitude: String(location.latitude),
+                longitude: String(location.longitude),
+              })}
+              onLocate={onLocate}
+              locating={locating}
+            />
+          </Field>
 
           <ImageUploadSection
             existingImages={[]}

@@ -135,6 +135,15 @@ source ~/.bashrc && npx --yes wrangler pages deploy dist --project-name trip --b
 
 Use manual deployment only for emergency or one-off cases. Normal deployment should be through GitHub pushes.
 
+Static asset cache policy:
+
+```text
+public/_headers
+```
+
+`/assets/*` intentionally uses `Cache-Control: public, max-age=0, must-revalidate`.
+Do not change it back to long-lived `immutable` caching unless the Pages SPA fallback is also changed to avoid serving `index.html` for missing hashed assets. With immutable asset caching, a newly generated CSS/JS URL can briefly resolve to the SPA fallback during Cloudflare edge propagation and then get cached as HTML, which makes the app appear unstyled until a manual redeploy or cache bypass.
+
 Check Cloudflare Pages deployments:
 
 ```bash

@@ -152,9 +152,16 @@ interface AddExpenseFormProps {
   onClose: () => void
   onSuccess: () => void
   editingExpense?: any
+  expenseDraft?: {
+    title?: string
+    category?: string
+    expense_date?: string
+    timeline_entry_id?: string
+    timeline_entry_title?: string
+  } | null
 }
 
-export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: AddExpenseFormProps) {
+export default function AddExpenseForm({ onClose, onSuccess, editingExpense, expenseDraft }: AddExpenseFormProps) {
   const { user } = useAuthStore()
   const { currentTrip } = useTripStore()
   const queryClient = useQueryClient()
@@ -193,11 +200,13 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
   const { register, handleSubmit, watch, setValue, formState: { isSubmitting, errors } } = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
     values: {
-      title: editingExpense?.title || '',
+      title: editingExpense?.title || expenseDraft?.title || '',
       amount: editingExpense ? (Number(editingExpense.amount) / 100).toString() : '',
-      category: editingExpense?.category ? (knownCategories.includes(editingExpense.category) ? editingExpense.category : 'other') : 'other',
+      category: editingExpense?.category
+        ? (knownCategories.includes(editingExpense.category) ? editingExpense.category : 'other')
+        : (expenseDraft?.category && knownCategories.includes(expenseDraft.category) ? expenseDraft.category : 'other'),
       payer_member_id: editingExpense?.payer_member_id || currentMemberId,
-      expense_date: editingExpense?.expense_date || getLocalDateText(),
+      expense_date: editingExpense?.expense_date || expenseDraft?.expense_date || getLocalDateText(),
       participant_ids: editingExpense?.participants?.map((p: any) => p.member_id) || members?.map(m => m.id) || [],
       split_type: editingExpense?.participants?.length === 1 && editingExpense.participants[0].member_id === editingExpense.payer_member_id ? 'individual' : 'equal',
     }
@@ -211,8 +220,9 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
 
   const [categoryOpen, setCategoryOpen] = useState(false)
   const [payerOpen, setPayerOpen] = useState(false)
-  const [syncTimeline, setSyncTimeline] = useState(Boolean(editingExpense?.timeline_entry_id))
-  const [timelineType, setTimelineType] = useState<TimelineEntryType>(() => mapCategoryToTimelineType(editingExpense?.category || 'other'))
+  const linkedTimelineEntryId = expenseDraft?.timeline_entry_id || null
+  const [syncTimeline, setSyncTimeline] = useState(Boolean(editingExpense?.timeline_entry_id || linkedTimelineEntryId))
+  const [timelineType, setTimelineType] = useState<TimelineEntryType>(() => mapCategoryToTimelineType(editingExpense?.category || expenseDraft?.category || 'other'))
   const [timelineContent, setTimelineContent] = useState('')
   const [timelineRating, setTimelineRating] = useState('')
   const [includeInGuide, setIncludeInGuide] = useState(true)
@@ -276,6 +286,7 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
 
   const upsertLinkedTimelineEntry = async (values: ExpenseForm, amountInCents: number) => {
     if (!currentTrip || !currentMemberId || !syncTimeline) return editingExpense?.timeline_entry_id || null
+    if (!editingExpense && linkedTimelineEntryId) return linkedTimelineEntryId
 
     const day = await getOrCreateTripDay(values.expense_date)
     const payerName = members?.find((member) => member.id === values.payer_member_id)?.display_name || '未知成员'
@@ -651,104 +662,115 @@ export default function AddExpenseForm({ onClose, onSuccess, editingExpense }: A
 
             {syncTimeline && (
               <div className="animate-in fade-in slide-in-from-top-2 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">记录类型</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {timelineTypeOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setTimelineType(option.value)}
-                          className={`rounded-2xl border px-3 py-2.5 text-xs font-black transition-all ${
-                            timelineType === option.value
-                              ? 'border-white bg-white text-black'
-                              : 'border-white/10 bg-black/10 text-white/60 hover:bg-white/10 hover:text-white'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
+                {linkedTimelineEntryId && !editingExpense ? (
+                  <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 p-4">
+                    <p className="text-sm font-black text-emerald-50">已关联行程记录</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-emerald-50/65">
+                      {expenseDraft?.timeline_entry_title || expenseDraft?.title || '当前行程记录'}。保存后，这笔账单会归到这条记录下面。
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">评分</label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        max="5"
-                        value={timelineRating}
-                        onChange={(event) => setTimelineRating(event.target.value)}
-                        placeholder="1-5"
-                        className="w-full bg-black/20 border border-white/10 rounded-2xl px-4 py-4 pr-11 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm font-bold shadow-inner"
-                      />
-                      <Star className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">评价 / 消费清单</label>
-                  <textarea
-                    value={timelineContent}
-                    onChange={(event) => setTimelineContent(event.target.value)}
-                    placeholder="例如：推荐菜、购物清单、排队情况、避坑点..."
-                    rows={4}
-                    className="w-full resize-none bg-black/20 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm font-medium shadow-inner"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIncludeInGuide((value) => !value)}
-                  className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between gap-4 transition-all ${
-                    includeInGuide
-                      ? 'bg-emerald-400/15 border-emerald-300/20 text-emerald-50'
-                      : 'bg-black/10 border-white/10 text-white/55'
-                  }`}
-                >
-                  <span className="text-sm font-black">{includeInGuide ? '进入攻略素材' : '不进入攻略'}</span>
-                  <Check className={`h-4 w-4 ${includeInGuide ? 'opacity-100' : 'opacity-25'}`} />
-                </button>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">照片</label>
-                    <span className="text-[10px] font-black text-white/35">{timelineImages.length}/8</span>
-                  </div>
-                  {timelineImages.length > 0 && (
-                    <div className="space-y-2">
-                      {timelineImages.map((file, index) => (
-                        <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-black/20 border border-white/10 px-3 py-2">
-                          <span className="min-w-0 truncate text-xs font-bold text-white/70">{file.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => setTimelineImages((current) => current.filter((_, fileIndex) => fileIndex !== index))}
-                            className="shrink-0 rounded-xl p-1.5 text-white/45 hover:bg-white/10 hover:text-white"
-                            aria-label="移除图片"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">记录类型</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {timelineTypeOptions.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setTimelineType(option.value)}
+                              className={`rounded-2xl border px-3 py-2.5 text-xs font-black transition-all ${
+                                timelineType === option.value
+                                  ? 'border-white bg-white text-black'
+                                  : 'border-white/10 bg-black/10 text-white/60 hover:bg-white/10 hover:text-white'
+                              }`}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">评分</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={timelineRating}
+                            onChange={(event) => setTimelineRating(event.target.value)}
+                            placeholder="1-5"
+                            className="w-full bg-black/20 border border-white/10 rounded-2xl px-4 py-4 pr-11 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm font-bold shadow-inner"
+                          />
+                          <Star className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <label className="cursor-pointer rounded-2xl border border-white/10 bg-black/10 px-4 py-3.5 text-white/75 hover:bg-white/10 transition-all flex items-center justify-center gap-2 font-black">
-                    <ImagePlus className="w-4 h-4" />
-                    添加照片
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => {
-                        handleSelectTimelineImages(event.target.files)
-                        event.target.value = ''
-                      }}
-                    />
-                  </label>
-                </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">评价 / 消费清单</label>
+                      <textarea
+                        value={timelineContent}
+                        onChange={(event) => setTimelineContent(event.target.value)}
+                        placeholder="例如：推荐菜、购物清单、排队情况、避坑点..."
+                        rows={4}
+                        className="w-full resize-none bg-black/20 border border-white/10 rounded-2xl px-4 py-4 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm font-medium shadow-inner"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIncludeInGuide((value) => !value)}
+                      className={`w-full rounded-2xl border px-4 py-3 flex items-center justify-between gap-4 transition-all ${
+                        includeInGuide
+                          ? 'bg-emerald-400/15 border-emerald-300/20 text-emerald-50'
+                          : 'bg-black/10 border-white/10 text-white/55'
+                      }`}
+                    >
+                      <span className="text-sm font-black">{includeInGuide ? '进入攻略素材' : '不进入攻略'}</span>
+                      <Check className={`h-4 w-4 ${includeInGuide ? 'opacity-100' : 'opacity-25'}`} />
+                    </button>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-text-sub uppercase tracking-widest pl-1">照片</label>
+                        <span className="text-[10px] font-black text-white/35">{timelineImages.length}/8</span>
+                      </div>
+                      {timelineImages.length > 0 && (
+                        <div className="space-y-2">
+                          {timelineImages.map((file, index) => (
+                            <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-2xl bg-black/20 border border-white/10 px-3 py-2">
+                              <span className="min-w-0 truncate text-xs font-bold text-white/70">{file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => setTimelineImages((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                                className="shrink-0 rounded-xl p-1.5 text-white/45 hover:bg-white/10 hover:text-white"
+                                aria-label="移除图片"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <label className="cursor-pointer rounded-2xl border border-white/10 bg-black/10 px-4 py-3.5 text-white/75 hover:bg-white/10 transition-all flex items-center justify-center gap-2 font-black">
+                        <ImagePlus className="w-4 h-4" />
+                        添加照片
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(event) => {
+                            handleSelectTimelineImages(event.target.files)
+                            event.target.value = ''
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </section>

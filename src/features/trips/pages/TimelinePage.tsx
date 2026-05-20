@@ -52,6 +52,7 @@ import {
   Navigation,
   Plane,
   Plus,
+  ReceiptText,
   Route,
   Ship,
   Send,
@@ -65,6 +66,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useTripStore } from '@/stores/useTripStore'
+import { useUIStore } from '@/stores/useUIStore'
 import { Trip } from '@/types/trip'
 
 type TimelineEntryType = 'transport' | 'place' | 'meal' | 'hotel' | 'activity' | 'note' | 'tip' | 'pitfall'
@@ -156,6 +158,15 @@ type TimelineEntry = {
   images?: TimelineImage[]
   comments?: TimelineComment[]
   created_by_member?: { display_name: string } | null
+}
+
+type LinkedExpense = {
+  id: string
+  title: string
+  amount: number
+  category: string
+  timeline_entry_id: string | null
+  payer?: { display_name: string } | null
 }
 
 type EntryForm = {
@@ -277,6 +288,15 @@ const transportModes: Array<{ value: string; label: string; icon: React.ElementT
   { value: 'ferry', label: '轮渡', icon: Ship },
   { value: 'other', label: '其他', icon: Route },
 ]
+
+const mapEntryTypeToExpenseCategory = (type: TimelineEntryType) => {
+  if (type === 'meal') return 'food'
+  if (type === 'hotel') return 'hotel'
+  if (type === 'transport') return 'transport'
+  if (type === 'activity') return 'entertainment'
+  if (type === 'place') return 'ticket'
+  return 'other'
+}
 
 const mapStyleOptions: MapStyleOption[] = [
   { value: 'amap://styles/normal', label: '标准' },
@@ -801,6 +821,7 @@ export default function TimelinePage() {
 
 function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
   const { user } = useAuthStore()
+  const { openAddExpense } = useUIStore()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -919,7 +940,31 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     enabled: !!activeDay,
   })
 
+  const { data: linkedExpenses } = useQuery<LinkedExpense[]>({
+    queryKey: ['timelineLinkedExpenses', currentTrip.id, activeDay?.id],
+    queryFn: async () => {
+      if (!activeDay) return []
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, title, amount, category, timeline_entry_id, payer:trip_members!payer_member_id(display_name)')
+        .eq('trip_id', currentTrip.id)
+        .not('timeline_entry_id', 'is', null)
+        .eq('expense_date', activeDay.date)
+      if (error) throw error
+      return data as unknown as LinkedExpense[]
+    },
+    enabled: !!activeDay,
+  })
+
   const sortedEntries = useMemo(() => sortTimelineEntries(entries || []), [entries])
+  const linkedExpensesByEntryId = useMemo(() => {
+    const map = new Map<string, LinkedExpense[]>()
+    for (const expense of linkedExpenses || []) {
+      if (!expense.timeline_entry_id) continue
+      map.set(expense.timeline_entry_id, [...(map.get(expense.timeline_entry_id) || []), expense])
+    }
+    return map
+  }, [linkedExpenses])
   const sortableEntryIds = useMemo(() => sortedEntries.map((entry) => entry.id), [sortedEntries])
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1495,6 +1540,17 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
     queryClient.invalidateQueries({ queryKey: ['timelineEntries', currentTrip.id, activeDay?.id] })
   }
 
+  const handleCreateExpenseForEntry = (entry: TimelineEntry) => {
+    if (!activeDay) return
+    openAddExpense(null, {
+      title: entry.place_name || entry.title,
+      category: mapEntryTypeToExpenseCategory(entry.type),
+      expense_date: activeDay.date,
+      timeline_entry_id: entry.id,
+      timeline_entry_title: entry.title,
+    })
+  }
+
   const persistEntryOrder = async (orderedEntries: TimelineEntry[]) => {
     if (!activeDay) return
     setReordering(true)
@@ -1793,6 +1849,9 @@ function TimelineContent({ currentTrip }: { currentTrip: Trip }) {
                       onAddComment={() => handleAddComment(entry)}
                       onDeleteComment={handleDeleteComment}
                       onPatchEntry={(patch) => handlePatchEntry(entry, patch)}
+                      onCreateExpense={() => handleCreateExpenseForEntry(entry)}
+                      linkedExpenses={linkedExpensesByEntryId.get(entry.id) || []}
+                      currency={currentTrip.currency}
                       savingComment={savingCommentEntryId === entry.id}
                       deletingCommentId={deletingCommentId}
                       currentMemberId={currentMember?.id || null}
@@ -2217,6 +2276,9 @@ function TimelineCard({
   onAddComment,
   onDeleteComment,
   onPatchEntry,
+  onCreateExpense,
+  linkedExpenses,
+  currency,
   savingComment,
   deletingCommentId,
   currentMemberId,
@@ -2237,6 +2299,9 @@ function TimelineCard({
   onAddComment: () => void
   onDeleteComment: (comment: TimelineComment) => void
   onPatchEntry: (patch: TimelineEntryPatch) => void
+  onCreateExpense: () => void
+  linkedExpenses: LinkedExpense[]
+  currency?: string | null
   savingComment: boolean
   deletingCommentId: string | null
   currentMemberId: string | null
@@ -2277,6 +2342,7 @@ function TimelineCard({
   const comments = [...(entry.comments || [])].sort((a, b) => (
     new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
   ))
+  const linkedExpenseTotal = linkedExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
   const materialHints = getEntryMaterialHints(entry)
   const isMarkedTodo = (entry.tags || []).includes('待补充')
   const materialLabel = !entry.include_in_guide
@@ -2408,6 +2474,47 @@ function TimelineCard({
               ))}
             </div>
           )}
+
+          <div className="mt-4 rounded-[22px] border border-sky-300/15 bg-sky-400/10 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs font-black text-sky-50/75">
+                  <ReceiptText className="h-4 w-4" />
+                  关联账单
+                </div>
+                {linkedExpenses.length > 0 ? (
+                  <p className="mt-1 text-sm font-black text-white">
+                    {(linkedExpenseTotal / 100).toFixed(2)} {currency || ''}
+                    <span className="ml-2 text-xs text-white/45">{linkedExpenses.length} 笔</span>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs font-bold text-white/45">这条记录还没有关联消费。</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={onCreateExpense}
+                className="shrink-0 rounded-2xl border border-white/10 bg-white px-4 py-3 text-xs font-black text-black hover:bg-white/90"
+              >
+                记账
+              </button>
+            </div>
+            {linkedExpenses.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {linkedExpenses.slice(0, 3).map((expense) => (
+                  <div key={expense.id} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/10 px-3 py-2">
+                    <span className="min-w-0 truncate text-xs font-bold text-white/65">
+                      {expense.title}
+                      {expense.payer?.display_name ? <span className="text-white/35"> · {expense.payer.display_name} 支付</span> : null}
+                    </span>
+                    <span className="shrink-0 text-xs font-black text-white">
+                      {(Number(expense.amount || 0) / 100).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="mt-4 rounded-[22px] border border-white/10 bg-white/[0.04] p-3">
             <div className="mb-3 flex flex-wrap items-center gap-2">

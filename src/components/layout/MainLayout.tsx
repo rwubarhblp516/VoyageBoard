@@ -28,7 +28,7 @@ export default function MainLayout() {
     { id: '/timeline', icon: Route, label: '记录' },
   ]
 
-  const { isAddExpenseModalOpen, openAddExpense, closeAddExpense, editingExpense } = useUIStore()
+  const { isAddExpenseModalOpen, openAddExpense, closeAddExpense, editingExpense, addExpenseDraft } = useUIStore()
   const queryClient = useQueryClient()
 
   return (
@@ -171,12 +171,14 @@ export default function MainLayout() {
         {isAddExpenseModalOpen && (
           <AddExpenseForm
             editingExpense={editingExpense}
+            expenseDraft={addExpenseDraft}
             onClose={closeAddExpense}
             onSuccess={() => {
               queryClient.invalidateQueries({ queryKey: ['expenses'] })
               queryClient.invalidateQueries({ queryKey: ['dashboard'] })
               queryClient.invalidateQueries({ queryKey: ['settlement'] })
               queryClient.invalidateQueries({ queryKey: ['timelineEntries'] })
+              queryClient.invalidateQueries({ queryKey: ['timelineLinkedExpenses'] })
             }}
           />
         )}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Camera, Loader2, MessageCircle, Newspaper, Star, Utensils } from 'lucide-react'
+import { AlertTriangle, Camera, Loader2, MessageCircle, Newspaper, ReceiptText, Star, Utensils, WalletCards } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 
@@ -45,9 +45,21 @@ type TimelineEntry = {
 }
 
 type Expense = {
+  id: string
+  title: string
   amount: number
   category: string
+  expense_date: string
+  timeline_entry_id: string | null
   participants?: Array<{ calculated_amount: number }>
+}
+
+type ExpenseSummary = {
+  total: number
+  count: number
+  participants: number
+  categories: Record<string, number>
+  expenses: Expense[]
 }
 
 declare global {
@@ -97,6 +109,30 @@ const formatDuration = (minutes?: number | null) => {
   const rest = minutes % 60
   return rest ? `${hours}小时${rest}分钟` : `${hours}小时`
 }
+
+const formatMoney = (amountInCents: number, currency?: string | null) => (
+  `${(amountInCents / 100).toFixed(2)} ${currency || ''}`.trim()
+)
+
+const emptyExpenseSummary = (): ExpenseSummary => ({
+  total: 0,
+  count: 0,
+  participants: 0,
+  categories: {},
+  expenses: [],
+})
+
+const summarizeExpenses = (expenses: Expense[]): ExpenseSummary => (
+  expenses.reduce<ExpenseSummary>((summary, expense) => {
+    const participantCount = expense.participants?.length || 0
+    summary.total += Number(expense.amount || 0)
+    summary.count += 1
+    summary.participants += participantCount
+    summary.categories[expense.category] = (summary.categories[expense.category] || 0) + Number(expense.amount || 0)
+    summary.expenses.push(expense)
+    return summary
+  }, emptyExpenseSummary())
+)
 
 const getTimelineImageUrl = (storagePath: string) => (
   supabase.storage.from('trip-images').getPublicUrl(storagePath).data.publicUrl
@@ -175,7 +211,7 @@ export default function GuidePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('amount, category, participants:expense_participants(calculated_amount)')
+        .select('id, title, amount, category, expense_date, timeline_entry_id, participants:expense_participants(calculated_amount)')
         .eq('trip_id', currentTrip.id)
       if (error) throw error
       return data as Expense[]
@@ -216,6 +252,23 @@ export default function GuidePage() {
       categoryTotals,
     }
   }, [entries, expenses])
+
+  const expensesByEntryId = useMemo(() => {
+    const groups = new Map<string, Expense[]>()
+    ;(expenses || []).forEach((expense) => {
+      if (!expense.timeline_entry_id) return
+      groups.set(expense.timeline_entry_id, [...(groups.get(expense.timeline_entry_id) || []), expense])
+    })
+    return groups
+  }, [expenses])
+
+  const expensesByDate = useMemo(() => {
+    const groups = new Map<string, Expense[]>()
+    ;(expenses || []).forEach((expense) => {
+      groups.set(expense.expense_date, [...(groups.get(expense.expense_date) || []), expense])
+    })
+    return groups
+  }, [expenses])
 
   const isLoading = daysLoading || entriesLoading
 
@@ -273,6 +326,7 @@ export default function GuidePage() {
 
           {(days || []).map((day) => {
             const dayEntries = sortEntries(entriesByDay.get(day.id) || [])
+            const dayExpenseSummary = summarizeExpenses(expensesByDate.get(day.date) || [])
             if (dayEntries.length === 0) return null
             return (
               <section key={day.id} className="glass-card overflow-hidden rounded-[32px] border border-white/10">
@@ -287,8 +341,17 @@ export default function GuidePage() {
                     </span>
                   </div>
 
+                  <DayExpenseSummary summary={dayExpenseSummary} currency={currentTrip.currency} />
+
                   <div className="space-y-3">
-                    {dayEntries.map((entry) => <GuideEntryCard key={entry.id} entry={entry} />)}
+                    {dayEntries.map((entry) => (
+                      <GuideEntryCard
+                        key={entry.id}
+                        entry={entry}
+                        expenseSummary={summarizeExpenses(expensesByEntryId.get(entry.id) || [])}
+                        currency={currentTrip.currency}
+                      />
+                    ))}
                   </div>
                 </div>
               </section>
@@ -326,11 +389,44 @@ function GuideStat({ icon, label, value }: { icon: React.ReactNode; label: strin
   )
 }
 
-function GuideEntryCard({ entry }: { entry: TimelineEntry }) {
+function DayExpenseSummary({ summary, currency }: { summary: ExpenseSummary; currency?: string | null }) {
+  if (summary.count === 0) {
+    return (
+      <div className="mb-4 rounded-[22px] border border-white/10 bg-white/[0.04] p-4 text-sm font-bold text-white/45">
+        当天还没有账单记录。
+      </div>
+    )
+  }
+
+  const topCategories = Object.entries(summary.categories).sort((a, b) => b[1] - a[1]).slice(0, 3)
+
+  return (
+    <div className="mb-4 rounded-[22px] border border-sky-300/15 bg-sky-400/10 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-sm font-black text-sky-50">
+          <WalletCards className="h-4 w-4" />
+          当天费用 {formatMoney(summary.total, currency)}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {topCategories.map(([category, amount]) => (
+            <span key={category} className="rounded-full border border-white/10 bg-black/10 px-3 py-1 text-[11px] font-black text-white/65">
+              {categoryLabels[category] || category} {formatMoney(amount, currency)}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function GuideEntryCard({ entry, expenseSummary, currency }: { entry: TimelineEntry; expenseSummary: ExpenseSummary; currency?: string | null }) {
   const segment = entry.travel_segments?.[0]
   const detail = entry.type === 'transport' && segment
     ? `${segment.origin_name} -> ${segment.destination_name}${segment.distance_km ? ` · ${segment.distance_km}km` : ''}${segment.duration_minutes ? ` · ${formatDuration(segment.duration_minutes)}` : ''}`
     : [entry.place_name, entry.rating ? `${entry.rating}星` : null].filter(Boolean).join(' · ')
+  const averageAmount = expenseSummary.participants > 0
+    ? Math.round(expenseSummary.total / expenseSummary.participants)
+    : null
 
   return (
     <article className="rounded-[24px] border border-white/10 bg-black/15 p-4">
@@ -342,6 +438,27 @@ function GuideEntryCard({ entry }: { entry: TimelineEntry }) {
       </div>
       <h3 className="text-lg font-black text-white">{entry.title}</h3>
       {detail && <p className="mt-1 text-sm font-bold text-white/55">{detail}</p>}
+      {expenseSummary.count > 0 && (
+        <div className="mt-3 rounded-2xl border border-sky-300/15 bg-sky-400/10 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="inline-flex items-center gap-2 text-xs font-black text-sky-50/75">
+              <ReceiptText className="h-4 w-4" />
+              关联费用
+            </span>
+            <span className="text-sm font-black text-white">
+              {formatMoney(expenseSummary.total, currency)}
+              {averageAmount !== null && <span className="ml-2 text-xs text-white/45">人均约 {formatMoney(averageAmount, currency)}</span>}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {expenseSummary.expenses.slice(0, 3).map((expense) => (
+              <span key={expense.id} className="rounded-full bg-black/15 px-2.5 py-1 text-[10px] font-black text-white/55">
+                {expense.title} · {formatMoney(Number(expense.amount || 0), currency)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       {entry.content && <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-6 text-white/75">{entry.content}</p>}
       {entry.comments && entry.comments.length > 0 && (
         <div className="mt-3 space-y-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3">

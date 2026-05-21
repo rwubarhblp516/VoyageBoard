@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Camera, Loader2, MessageCircle, Newspaper, ReceiptText, Star, Utensils, WalletCards } from 'lucide-react'
+import { AlertTriangle, Camera, Check, Copy, Loader2, MessageCircle, Newspaper, ReceiptText, Star, Utensils, WalletCards } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useTripStore } from '@/stores/useTripStore'
 
@@ -165,6 +165,47 @@ const guideFilters: Array<{ value: GuideFilter; label: string }> = [
   { value: 'expenses', label: '有费用' },
 ]
 
+const getFilterLabel = (filter: GuideFilter) => (
+  guideFilters.find((item) => item.value === filter)?.label || '全部'
+)
+
+const compactText = (text?: string | null) => (
+  (text || '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+)
+
+const getEntryDetail = (entry: TimelineEntry) => {
+  const segment = entry.travel_segments?.[0]
+  if (entry.type === 'transport' && segment) {
+    return [
+      `${segment.origin_name} -> ${segment.destination_name}`,
+      segment.distance_km ? `${segment.distance_km}km` : null,
+      segment.duration_minutes ? formatDuration(segment.duration_minutes) : null,
+    ].filter(Boolean).join(' · ')
+  }
+  return [
+    entry.place_name,
+    entry.rating ? `${entry.rating}星` : null,
+    entry.recommend_level === 'recommend' ? '推荐' : entry.recommend_level === 'avoid' ? '避坑' : null,
+  ].filter(Boolean).join(' · ')
+}
+
+const writeClipboardText = async (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', 'true')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  document.body.removeChild(textarea)
+}
+
 const loadAMap = async () => {
   const key = import.meta.env.VITE_AMAP_JS_API_KEY
   const securityJsCode = import.meta.env.VITE_AMAP_SECURITY_JS_CODE
@@ -187,6 +228,8 @@ const loadAMap = async () => {
 export default function GuidePage() {
   const { currentTrip } = useTripStore()
   const [activeFilter, setActiveFilter] = useState<GuideFilter>('all')
+  const [markdownCopied, setMarkdownCopied] = useState(false)
+  const [markdownCopying, setMarkdownCopying] = useState(false)
 
   if (!currentTrip) return <Navigate to="/trips" replace />
 
@@ -311,6 +354,110 @@ export default function GuidePage() {
     ), 0),
   }), [expensesByEntryId, filteredEntries])
 
+  const buildGuideMarkdown = () => {
+    const lines: string[] = []
+    const tripTitle = currentTrip.destination || currentTrip.title
+    const filterLabel = getFilterLabel(activeFilter)
+    const filteredRecommendations = filteredEntries.filter((entry) => entry.recommend_level === 'recommend')
+    const filteredPitfalls = filteredEntries.filter((entry) => entry.type === 'pitfall' || entry.recommend_level === 'avoid')
+
+    lines.push(`# ${tripTitle}旅行攻略`)
+    lines.push('')
+    lines.push(`- 时间：${formatDateLabel(currentTrip.start_date)} - ${formatDateLabel(currentTrip.end_date)}`)
+    lines.push(`- 版本：${filterLabel}`)
+    lines.push(`- 素材：${filteredStats.entryCount} 条`)
+    lines.push(`- 照片：${filteredStats.photoCount} 张`)
+    lines.push(`- 关联费用：${formatMoney(filteredStats.expenseTotal, currentTrip.currency)}`)
+    lines.push('')
+
+    lines.push('## 每日行程')
+    ;(days || []).forEach((day) => {
+      const dayEntries = sortEntries(filteredEntriesByDay.get(day.id) || [])
+      if (dayEntries.length === 0) return
+      const dayExpenseSummary = summarizeExpenses(expensesByDate.get(day.date) || [])
+
+      lines.push('')
+      lines.push(`### Day ${day.day_index} · ${formatDateLabel(day.date)}${day.city ? ` · ${day.city}` : ''}`)
+      if (dayExpenseSummary.count > 0) {
+        const categories = Object.entries(dayExpenseSummary.categories)
+          .sort((a, b) => b[1] - a[1])
+          .map(([category, amount]) => `${categoryLabels[category] || category} ${formatMoney(amount, currentTrip.currency)}`)
+          .join('；')
+        lines.push(`当天费用：${formatMoney(dayExpenseSummary.total, currentTrip.currency)}${categories ? `（${categories}）` : ''}`)
+      }
+
+      dayEntries.forEach((entry) => {
+        const entryExpenseSummary = summarizeExpenses(expensesByEntryId.get(entry.id) || [])
+        const timeText = [formatTime(entry.start_time), formatTime(entry.end_time)].filter(Boolean).join('-')
+        const titleParts = [
+          timeText || null,
+          `【${typeLabels[entry.type] || entry.type}】`,
+          entry.title,
+        ].filter(Boolean)
+
+        lines.push('')
+        lines.push(`- ${titleParts.join(' ')}`)
+        const detail = getEntryDetail(entry)
+        if (detail) lines.push(`  - 信息：${detail}`)
+        if (entryExpenseSummary.count > 0) {
+          const average = entryExpenseSummary.participants > 0
+            ? `，人均约 ${formatMoney(Math.round(entryExpenseSummary.total / entryExpenseSummary.participants), currentTrip.currency)}`
+            : ''
+          lines.push(`  - 费用：${formatMoney(entryExpenseSummary.total, currentTrip.currency)}${average}`)
+        }
+        if ((entry.images || []).length > 0) lines.push(`  - 照片：${entry.images!.length} 张`)
+        const content = compactText(entry.content)
+        if (content) lines.push(`  - 记录：${content.replace(/\n/g, '\n    ')}`)
+        ;(entry.comments || []).forEach((comment) => {
+          const commentText = compactText(comment.content)
+          if (commentText) lines.push(`  - 补充：${comment.created_by_member?.display_name || '成员'}：${commentText.replace(/\n/g, '\n    ')}`)
+        })
+      })
+    })
+
+    if (filteredRecommendations.length > 0) {
+      lines.push('')
+      lines.push('## 推荐清单')
+      filteredRecommendations.forEach((entry) => {
+        const detail = getEntryDetail(entry)
+        lines.push(`- ${entry.title}${detail ? `：${detail}` : ''}`)
+      })
+    }
+
+    if (filteredPitfalls.length > 0) {
+      lines.push('')
+      lines.push('## 避坑提醒')
+      filteredPitfalls.forEach((entry) => {
+        const content = compactText(entry.content)
+        lines.push(`- ${entry.title}${content ? `：${content}` : ''}`)
+      })
+    }
+
+    const categoryEntries = Object.entries(guideStats.categoryTotals).sort((a, b) => b[1] - a[1])
+    if (categoryEntries.length > 0) {
+      lines.push('')
+      lines.push('## 费用参考')
+      categoryEntries.forEach(([category, amount]) => {
+        lines.push(`- ${categoryLabels[category] || category}：${formatMoney(amount, currentTrip.currency)}`)
+      })
+    }
+
+    return `${lines.join('\n').trim()}\n`
+  }
+
+  const handleCopyMarkdown = async () => {
+    setMarkdownCopying(true)
+    try {
+      await writeClipboardText(buildGuideMarkdown())
+      setMarkdownCopied(true)
+      window.setTimeout(() => setMarkdownCopied(false), 1800)
+    } catch (error: any) {
+      alert(error?.message || '复制失败，请稍后再试')
+    } finally {
+      setMarkdownCopying(false)
+    }
+  }
+
   const isLoading = daysLoading || entriesLoading
 
   return (
@@ -323,6 +470,15 @@ export default function GuidePage() {
         </div>
         <h1 className="text-4xl font-black tracking-tight text-white sm:text-5xl">{currentTrip.destination || currentTrip.title}旅行攻略</h1>
         <p className="mt-2 text-sm font-bold text-white/70">根据当前已记录素材实时生成，可随时回来重新查看。</p>
+        <button
+          type="button"
+          onClick={handleCopyMarkdown}
+          disabled={markdownCopying || filteredEntries.length === 0}
+          className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-5 py-3 text-sm font-black text-black shadow-xl transition-all hover:bg-white/90 disabled:bg-white/15 disabled:text-white/35"
+        >
+          {markdownCopying ? <Loader2 className="h-4 w-4 animate-spin" /> : markdownCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          {markdownCopied ? '已复制攻略' : '复制 Markdown 攻略'}
+        </button>
       </header>
 
       {isLoading ? (

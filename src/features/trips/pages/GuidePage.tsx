@@ -62,6 +62,8 @@ type ExpenseSummary = {
   expenses: Expense[]
 }
 
+type GuideFilter = 'all' | 'recommend' | 'pitfall' | 'photos' | 'expenses'
+
 declare global {
   interface Window {
     AMap?: any
@@ -155,6 +157,14 @@ const sortEntries = (entries: TimelineEntry[]) => (
   [...entries].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 )
 
+const guideFilters: Array<{ value: GuideFilter; label: string }> = [
+  { value: 'all', label: '全部' },
+  { value: 'recommend', label: '推荐' },
+  { value: 'pitfall', label: '避坑' },
+  { value: 'photos', label: '有照片' },
+  { value: 'expenses', label: '有费用' },
+]
+
 const loadAMap = async () => {
   const key = import.meta.env.VITE_AMAP_JS_API_KEY
   const securityJsCode = import.meta.env.VITE_AMAP_SECURITY_JS_CODE
@@ -176,6 +186,7 @@ const loadAMap = async () => {
 
 export default function GuidePage() {
   const { currentTrip } = useTripStore()
+  const [activeFilter, setActiveFilter] = useState<GuideFilter>('all')
 
   if (!currentTrip) return <Navigate to="/trips" replace />
 
@@ -270,6 +281,36 @@ export default function GuidePage() {
     return groups
   }, [expenses])
 
+  const matchesFilter = (entry: TimelineEntry) => {
+    if (activeFilter === 'all') return true
+    if (activeFilter === 'recommend') return entry.recommend_level === 'recommend'
+    if (activeFilter === 'pitfall') return entry.type === 'pitfall' || entry.recommend_level === 'avoid'
+    if (activeFilter === 'photos') return (entry.images || []).length > 0
+    if (activeFilter === 'expenses') return (expensesByEntryId.get(entry.id) || []).length > 0
+    return true
+  }
+
+  const filteredEntries = useMemo(() => (
+    guideEntries.filter(matchesFilter)
+  ), [activeFilter, expensesByEntryId, guideEntries])
+
+  const filteredEntriesByDay = useMemo(() => {
+    const groups = new Map<string, TimelineEntry[]>()
+    filteredEntries.forEach((entry) => {
+      groups.set(entry.day_id, [...(groups.get(entry.day_id) || []), entry])
+    })
+    return groups
+  }, [filteredEntries])
+
+  const filteredStats = useMemo(() => ({
+    entryCount: filteredEntries.length,
+    photoCount: filteredEntries.reduce((sum, entry) => sum + (entry.images?.length || 0), 0),
+    commentCount: filteredEntries.reduce((sum, entry) => sum + (entry.comments?.length || 0), 0),
+    expenseTotal: filteredEntries.reduce((sum, entry) => (
+      sum + summarizeExpenses(expensesByEntryId.get(entry.id) || []).total
+    ), 0),
+  }), [expensesByEntryId, filteredEntries])
+
   const isLoading = daysLoading || entriesLoading
 
   return (
@@ -292,10 +333,29 @@ export default function GuidePage() {
         <div className="space-y-6">
           <section className="glass-card rounded-[32px] border border-white/10 p-5 sm:p-6">
             <div className="grid gap-3 sm:grid-cols-4">
-              <GuideStat icon={<Newspaper className="h-4 w-4" />} label="素材" value={`${guideStats.entryCount} 条`} />
-              <GuideStat icon={<Camera className="h-4 w-4" />} label="照片" value={`${guideStats.photoCount} 张`} />
-              <GuideStat icon={<MessageCircle className="h-4 w-4" />} label="补充" value={`${guideStats.commentCount} 条`} />
-              <GuideStat icon={<Utensils className="h-4 w-4" />} label="费用" value={`${(guideStats.totalExpense / 100).toFixed(2)} ${currentTrip.currency || ''}`} />
+              <GuideStat icon={<Newspaper className="h-4 w-4" />} label="素材" value={`${filteredStats.entryCount} 条`} />
+              <GuideStat icon={<Camera className="h-4 w-4" />} label="照片" value={`${filteredStats.photoCount} 张`} />
+              <GuideStat icon={<MessageCircle className="h-4 w-4" />} label="补充" value={`${filteredStats.commentCount} 条`} />
+              <GuideStat icon={<Utensils className="h-4 w-4" />} label="关联费用" value={formatMoney(filteredStats.expenseTotal, currentTrip.currency)} />
+            </div>
+            <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {guideFilters.map((filter) => {
+                const isActive = filter.value === activeFilter
+                return (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setActiveFilter(filter.value)}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition-all ${
+                      isActive
+                        ? 'border-white bg-white text-black'
+                        : 'border-white/10 bg-black/10 text-white/55 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                )
+              })}
             </div>
           </section>
 
@@ -318,14 +378,14 @@ export default function GuidePage() {
                 <p className="mt-1 text-xs font-bold text-white/45">所有已记录点位会整合到这一张地图里，按行程顺序连线。</p>
               </div>
               <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-white/55">
-                {guideEntries.length} 条素材
+                {filteredEntries.length} 条素材
               </span>
             </div>
-            <GuideOverviewMap entries={guideEntries} />
+            <GuideOverviewMap entries={filteredEntries} />
           </section>
 
           {(days || []).map((day) => {
-            const dayEntries = sortEntries(entriesByDay.get(day.id) || [])
+            const dayEntries = sortEntries(filteredEntriesByDay.get(day.id) || [])
             const dayExpenseSummary = summarizeExpenses(expensesByDate.get(day.date) || [])
             if (dayEntries.length === 0) return null
             return (

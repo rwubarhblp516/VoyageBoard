@@ -636,6 +636,7 @@ export type Database = {
       trips: {
         Row: {
           created_at: string | null
+          cover_url: string | null
           currency: string | null
           destination: string
           end_date: string
@@ -646,6 +647,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          cover_url?: string | null
           currency?: string | null
           destination: string
           end_date: string
@@ -656,6 +658,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          cover_url?: string | null
           currency?: string | null
           destination?: string
           end_date?: string
